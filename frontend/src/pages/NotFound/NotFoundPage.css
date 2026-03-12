@@ -1,0 +1,85 @@
+.nf-root {
+  min-height: 100vh;
+  background: #080808;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.nf-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  padding: 2rem;
+  animation: nfFadeIn 0.7s ease both;
+}
+
+@keyframes nfFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nf-code {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(5rem, 15vw, 8rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, #ff3c64, #c96dff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.nf-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.6rem;
+}
+
+.nf-desc {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+  font-weight: 300;
+  margin: 0 0 2rem;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+.nf-btn {
+  background: linear-gradient(135deg, #ff3c64, #e0245e);
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 24px rgba(255, 60, 100, 0.35);
+  text-decoration: none;
+}
+
+.nf-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 10px 32px rgba(255, 60, 100, 0.5);
+}
+
+.nf-vinyl {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  animation: nfSpin 4s linear infinite;
+}
+
+@keyframes nfSpin {
+  to { transform: rotate(360deg); }
+}

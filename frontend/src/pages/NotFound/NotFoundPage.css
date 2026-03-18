@@ -28,7 +28,6 @@
 .nf-code {
   font-family: 'Syne', sans-serif;
   font-size: clamp(5rem, 15vw, 8rem);
-  font-weight: 800;
   background: linear-gradient(135deg, #ff3c64, #c96dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -40,7 +39,6 @@
 .nf-title {
   font-family: 'Syne', sans-serif;
   font-size: clamp(1.2rem, 3vw, 1.8rem);
-  font-weight: 700;
   color: #fff;
   margin: 0 0 0.6rem;
 }

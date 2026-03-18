@@ -70,8 +70,7 @@
 
 .auth-left-logo-text {
   font-family: 'Syne', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 800;
+  font-size: 2rem;
   background: linear-gradient(135deg, #ff3c64, #c96dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -150,8 +149,7 @@
 
 .auth-left-headline {
   font-family: 'Syne', sans-serif;
-  font-size: 1.8rem;
-  font-weight: 800;
+  font-size: 3rem;
   line-height: 1.15;
   color: #fff;
   margin: 0 0 0.8rem;
@@ -263,9 +261,8 @@
 }
 
 .auth-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 1.8rem;
-  font-weight: 800;
+  font-family: 'syne', sans-serif;
+  font-size: 2.5rem;
   color: #fff;
   margin: 0 0 0.4rem;
 }

@@ -2,12 +2,15 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LandingPage from "../pages/Landing/LandingPage";
 import AuthPage from "../pages/Auth/AuthPage";
+import DashboardPage from "../pages/Dashboard/DashboardPage";
+import AnalyzePage from "../pages/Analyze/AnalyzePage";
+import ResultPage from "../pages/Result/ResultPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000, //5 minutes
       retry: 1,
     },
   },
@@ -20,8 +23,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
-          {/* Example: protect future routes like dashboard */}
-          {/* <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} /> */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/analyze" element={<AnalyzePage />} />
+          <Route path="/result" element={<ResultPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>

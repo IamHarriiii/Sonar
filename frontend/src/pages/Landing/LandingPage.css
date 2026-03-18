@@ -72,8 +72,7 @@
 
 .lp-nav-logo-text {
   font-family: 'Syne', sans-serif;
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 1.5em;
   background: linear-gradient(135deg, #ff3c64, #c96dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -155,7 +154,6 @@
 .lp-headline {
   font-family: 'Syne', sans-serif;
   font-size: clamp(2.4rem, 4.5vw, 3.8rem);
-  font-weight: 800;
   line-height: 1.08;
   margin: 0 0 1.4rem;
   color: #fff;
@@ -481,7 +479,6 @@
 .lp-stat-num {
   font-family: 'Syne', sans-serif;
   font-size: 1.6rem;
-  font-weight: 800;
   background: linear-gradient(135deg, #ff3c64, #c96dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -518,7 +515,6 @@
 .lp-section-title {
   font-family: 'Syne', sans-serif;
   font-size: clamp(1.6rem, 3.5vw, 2.6rem);
-  font-weight: 800;
   line-height: 1.15;
   margin: 0 0 1rem;
   color: #fff;
@@ -612,7 +608,6 @@
 .lp-card h3 {
   font-family: 'Syne', sans-serif;
   font-size: 1.05rem;
-  font-weight: 700;
   margin: 0 0 0.7rem;
   color: #fff;
 }
@@ -659,7 +654,6 @@
 .lp-step-num {
   font-family: 'Syne', sans-serif;
   font-size: 2rem;
-  font-weight: 800;
   background: linear-gradient(135deg, #ff3c64, #c96dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -672,7 +666,6 @@
 .lp-step-content h3 {
   font-family: 'Syne', sans-serif;
   font-size: 1.1rem;
-  font-weight: 700;
   margin: 0 0 0.5rem;
   color: #fff;
 }
@@ -723,7 +716,6 @@
 .lp-cta-banner h2 {
   font-family: 'Syne', sans-serif;
   font-size: clamp(1.6rem, 3.5vw, 2.4rem);
-  font-weight: 800;
   margin: 0 0 0.8rem;
   color: #fff;
   position: relative;

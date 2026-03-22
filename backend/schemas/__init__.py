@@ -47,3 +47,44 @@ class TokenRefreshResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Mood analysis schemas ──
+
+
+class MoodAnalyzeRequest(BaseModel):
+    text: str = Field(..., min_length=10, max_length=2000)
+
+
+class MoodDimension(BaseModel):
+    name: str
+    value: int
+    color: str
+
+
+class MoodAnalyzeResponse(BaseModel):
+    mood: str
+    moodEmoji: str
+    nuance: str
+    sentiment: str
+    confidence: int
+    explanation: str
+    dimensions: list[MoodDimension]
+
+
+class PlaylistRequest(BaseModel):
+    dimensions: list[MoodDimension]
+    preference: str = Field(..., pattern=r"^(match|uplift)$")
+
+
+class TrackResponse(BaseModel):
+    id: int
+    title: str
+    artist: str
+    duration: str
+    color: str
+
+
+class PlaylistResponse(BaseModel):
+    title: str
+    tracks: list[TrackResponse]

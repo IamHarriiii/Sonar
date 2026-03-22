@@ -10,6 +10,7 @@ from limiter import limiter
 from middleware.logging import RequestLoggingMiddleware, setup_logging
 from middleware.exceptions import register_exception_handlers
 from routes.auth import router as auth_router
+from routes.mood import router as mood_router
 
 settings = get_settings()
 
@@ -75,9 +76,11 @@ app.add_middleware(
 
 # ── Versioned API routes ──
 app.include_router(auth_router, prefix="/v1")
+app.include_router(mood_router, prefix="/v1")
 
 # Also register without prefix for backward compatibility
 app.include_router(auth_router)
+app.include_router(mood_router)
 
 
 @app.get("/")

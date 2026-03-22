@@ -65,10 +65,14 @@ class MoodDimension(BaseModel):
 class MoodAnalyzeResponse(BaseModel):
     mood: str
     moodEmoji: str
+    base_emotion: str
+    sub_emotion: str
     nuance: str
     sentiment: str
     confidence: int
     explanation: str
+    genre: str
+    genre_reason: str
     dimensions: list[MoodDimension]
 
 
@@ -79,6 +83,8 @@ class PlaylistRequest(BaseModel):
     artists: list[str] = Field(default=[])
     intensity: int = Field(default=50, ge=0, le=100)
     track_count: int = Field(default=15, ge=5, le=50)
+    genre: str = Field(default="pop")
+    base_emotion: str = Field(default="Calm")
 
 
 class TrackResponse(BaseModel):
@@ -87,6 +93,9 @@ class TrackResponse(BaseModel):
     artist: str
     duration: str
     color: str
+    album_art: str = ""
+    preview_url: str = ""
+    spotify_url: str = ""
 
 
 class PlaylistResponse(BaseModel):

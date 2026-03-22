@@ -66,7 +66,9 @@ export default function ResultPage() {
         languages,
         artists,
         intensity,
-        trackCount
+        trackCount,
+        analysisData.genre,
+        analysisData.base_emotion
       );
 
       navigate("/playlist", {
@@ -94,7 +96,7 @@ export default function ResultPage() {
 
   if (!analysisData) return null;
 
-  const { mood, moodEmoji, nuance, sentiment, confidence, explanation, dimensions } = analysisData;
+  const { mood, moodEmoji, base_emotion, sub_emotion, nuance, sentiment, confidence, explanation, genre, genre_reason, dimensions } = analysisData;
 
   const sentimentColors = {
     Positive: { bg: "rgba(74, 222, 128, 0.08)", border: "rgba(74, 222, 128, 0.25)", text: "#4ade80" },
@@ -123,12 +125,12 @@ export default function ResultPage() {
               <div className="rp-card">
                 <div className="rp-card-emoji">{moodEmoji}</div>
                 <div className="rp-card-label">Primary Emotion</div>
-                <div className="rp-card-value">{mood}</div>
+                <div className="rp-card-value">{base_emotion}</div>
               </div>
               <div className="rp-card">
                 <div className="rp-card-icon">✦</div>
-                <div className="rp-card-label">Nuance</div>
-                <div className="rp-card-value">{nuance}</div>
+                <div className="rp-card-label">Sub-emotion</div>
+                <div className="rp-card-value">{sub_emotion}</div>
               </div>
               <div className="rp-card" style={{ background: sc.bg, borderColor: sc.border }}>
                 <div className="rp-card-icon" style={{ color: sc.text }}>◎</div>
@@ -152,6 +154,13 @@ export default function ResultPage() {
           <section className="rp-explanation-section">
             <h2 className="rp-explanation-title">Why this emotion?</h2>
             <p className="rp-explanation-text">{explanation}</p>
+          </section>
+
+          {/* ── Genre Recommendation ── */}
+          <section className="rp-genre-section">
+            <div className="rp-genre-badge">🎵 RECOMMENDED GENRE</div>
+            <h2 className="rp-genre-name">{genre}</h2>
+            <p className="rp-genre-reason">{genre_reason}</p>
           </section>
 
           {/* ── Emotional Spectrum ── */}

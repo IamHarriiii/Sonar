@@ -25,8 +25,8 @@ async def analyze_text(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> MoodAnalyzeResponse:
-    """Analyze text input and return mood dimensions."""
-    result = analyze_mood(body.text)
+    """Analyze text input and return emotion analysis via LLM."""
+    result = await analyze_mood(body.text)
     return MoodAnalyzeResponse(**result)
 
 
@@ -38,13 +38,15 @@ async def get_playlist(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> PlaylistResponse:
-    """Generate a playlist based on mood dimensions and user preference."""
-    playlist = generate_playlist(
+    """Generate a Spotify playlist based on mood and user preferences."""
+    playlist = await generate_playlist(
         body.dimensions,
         body.preference,
         languages=body.languages,
         artists=body.artists,
         intensity=body.intensity,
         track_count=body.track_count,
+        genre=body.genre,
+        base_emotion=body.base_emotion,
     )
     return PlaylistResponse(**playlist)

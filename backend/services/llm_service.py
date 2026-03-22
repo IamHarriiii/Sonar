@@ -17,7 +17,14 @@ logger = logging.getLogger("sonar.llm")
 # ── Emotion taxonomy ──
 
 EMOTION_TAXONOMY = {
-    "Sadness": ["Melancholic", "Heartbroken", "Lonely", "Grief-stricken", "Disappointed", "Hopeless"],
+    "Sadness": [
+        "Melancholic",
+        "Heartbroken",
+        "Lonely",
+        "Grief-stricken",
+        "Disappointed",
+        "Hopeless",
+    ],
     "Joy": ["Euphoric", "Grateful", "Content", "Excited", "Proud", "Playful"],
     "Anger": ["Frustrated", "Irritated", "Resentful", "Bitter", "Furious"],
     "Fear": ["Anxious", "Overwhelmed", "Insecure", "Panicked", "Uneasy"],
@@ -26,22 +33,44 @@ EMOTION_TAXONOMY = {
 
 EMOTION_EMOJIS = {
     # Base
-    "Sadness": "😢", "Joy": "😊", "Anger": "😤", "Fear": "😰", "Calm": "🍃",
+    "Sadness": "😢",
+    "Joy": "😊",
+    "Anger": "😤",
+    "Fear": "😰",
+    "Calm": "🍃",
     # Sub — Sadness
-    "Melancholic": "🌧", "Heartbroken": "💔", "Lonely": "🌑", "Grief-stricken": "🕯",
-    "Disappointed": "😞", "Hopeless": "🌫",
+    "Melancholic": "🌧",
+    "Heartbroken": "💔",
+    "Lonely": "🌑",
+    "Grief-stricken": "🕯",
+    "Disappointed": "😞",
+    "Hopeless": "🌫",
     # Sub — Joy
-    "Euphoric": "✨", "Grateful": "🙏", "Content": "☀️", "Excited": "🎉",
-    "Proud": "🏆", "Playful": "🎈",
+    "Euphoric": "✨",
+    "Grateful": "🙏",
+    "Content": "☀️",
+    "Excited": "🎉",
+    "Proud": "🏆",
+    "Playful": "🎈",
     # Sub — Anger
-    "Frustrated": "😣", "Irritated": "😒", "Resentful": "😠", "Bitter": "🍋",
+    "Frustrated": "😣",
+    "Irritated": "😒",
+    "Resentful": "😠",
+    "Bitter": "🍋",
     "Furious": "🔥",
     # Sub — Fear
-    "Anxious": "😰", "Overwhelmed": "🌊", "Insecure": "🪞", "Panicked": "⚡",
+    "Anxious": "😰",
+    "Overwhelmed": "🌊",
+    "Insecure": "🪞",
+    "Panicked": "⚡",
     "Uneasy": "🌀",
     # Sub — Calm
-    "Peaceful": "🕊", "Reflective": "🌙", "Nostalgic": "🕰", "Dreamy": "☁️",
-    "Hopeful": "🌅", "Serene": "🧘",
+    "Peaceful": "🕊",
+    "Reflective": "🌙",
+    "Nostalgic": "🕰",
+    "Dreamy": "☁️",
+    "Hopeful": "🌅",
+    "Serene": "🧘",
 }
 
 DIMENSION_COLORS = {
@@ -82,8 +111,7 @@ _PROVIDERS = [
 # ── Taxonomy string for prompt ──
 
 _TAXONOMY_STR = "\n".join(
-    f"  {base}: {', '.join(subs)}"
-    for base, subs in EMOTION_TAXONOMY.items()
+    f"  {base}: {', '.join(subs)}" for base, subs in EMOTION_TAXONOMY.items()
 )
 
 # ── System prompt ──
@@ -138,7 +166,10 @@ async def _call_llm(provider: dict, text: str) -> dict:
                 "model": provider["model"],
                 "messages": [
                     {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Analyze the emotion in this text:\n\n{text}"},
+                    {
+                        "role": "user",
+                        "content": f"Analyze the emotion in this text:\n\n{text}",
+                    },
                 ],
                 "temperature": 0.3,
                 "max_tokens": 600,
@@ -191,16 +222,20 @@ async def analyze_emotion(text: str) -> dict:
             dimensions = []
             for dim_name in ["sadness", "joy", "anger", "fear", "calm", "energy"]:
                 val = max(5, min(100, int(dims_raw.get(dim_name, 20))))
-                dimensions.append({
-                    "name": dim_name.capitalize(),
-                    "value": val,
-                    "color": DIMENSION_COLORS.get(dim_name, "#888"),
-                })
+                dimensions.append(
+                    {
+                        "name": dim_name.capitalize(),
+                        "value": val,
+                        "color": DIMENSION_COLORS.get(dim_name, "#888"),
+                    }
+                )
 
             # Sort by value descending
             dimensions.sort(key=lambda d: d["value"], reverse=True)
 
-            logger.info(f"✓ {provider['name']}: {base} → {sub} (confidence: {result.get('confidence', 75)}%)")
+            logger.info(
+                f"✓ {provider['name']}: {base} → {sub} (confidence: {result.get('confidence', 75)}%)"
+            )
 
             return {
                 "mood": sub,
@@ -210,9 +245,13 @@ async def analyze_emotion(text: str) -> dict:
                 "nuance": sub,
                 "sentiment": result.get("sentiment", "Mixed"),
                 "confidence": max(60, min(98, int(result.get("confidence", 75)))),
-                "explanation": result.get("explanation", "Your words reveal a complex emotional state."),
+                "explanation": result.get(
+                    "explanation", "Your words reveal a complex emotional state."
+                ),
                 "genre": result.get("genre", "indie"),
-                "genre_reason": result.get("genre_reason", "This genre matches the emotional tone detected."),
+                "genre_reason": result.get(
+                    "genre_reason", "This genre matches the emotional tone detected."
+                ),
                 "dimensions": dimensions,
             }
 

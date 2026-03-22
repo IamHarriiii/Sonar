@@ -63,11 +63,38 @@ _GENRE_MAP = {
 
 # Spotify's available seed genres (subset for validation)
 _VALID_SEEDS = {
-    "acoustic", "alt-rock", "ambient", "blues", "chill", "classical",
-    "country", "dance", "disco", "edm", "electronic", "folk", "funk",
-    "gospel", "grunge", "hip-hop", "indie", "indie-pop", "jazz", "k-pop",
-    "latin", "metal", "new-age", "piano", "pop", "punk", "r-n-b",
-    "reggae", "rock", "soul", "soundtracks", "trip-hop",
+    "acoustic",
+    "alt-rock",
+    "ambient",
+    "blues",
+    "chill",
+    "classical",
+    "country",
+    "dance",
+    "disco",
+    "edm",
+    "electronic",
+    "folk",
+    "funk",
+    "gospel",
+    "grunge",
+    "hip-hop",
+    "indie",
+    "indie-pop",
+    "jazz",
+    "k-pop",
+    "latin",
+    "metal",
+    "new-age",
+    "piano",
+    "pop",
+    "punk",
+    "r-n-b",
+    "reggae",
+    "rock",
+    "soul",
+    "soundtracks",
+    "trip-hop",
 }
 
 
@@ -153,8 +180,11 @@ async def get_recommendations(
 
     # Map base emotion to valence (happiness measure)
     emotion_valence = {
-        "Joy": 0.8, "Calm": 0.55, "Sadness": 0.2,
-        "Anger": 0.3, "Fear": 0.25,
+        "Joy": 0.8,
+        "Calm": 0.55,
+        "Sadness": 0.2,
+        "Anger": 0.3,
+        "Fear": 0.25,
     }
     valence = emotion_valence.get(base_emotion, 0.5)
 
@@ -224,18 +254,22 @@ async def get_recommendations(
 
         artist_names = ", ".join(a["name"] for a in track.get("artists", []))
 
-        tracks.append({
-            "id": i + 1,
-            "title": track.get("name", "Unknown"),
-            "artist": artist_names,
-            "duration": duration_str,
-            "album_art": album_art,
-            "preview_url": track.get("preview_url", ""),
-            "spotify_url": track.get("external_urls", {}).get("spotify", ""),
-            "color": "#ff3c64",  # Default accent color
-        })
+        tracks.append(
+            {
+                "id": i + 1,
+                "title": track.get("name", "Unknown"),
+                "artist": artist_names,
+                "duration": duration_str,
+                "album_art": album_art,
+                "preview_url": track.get("preview_url", ""),
+                "spotify_url": track.get("external_urls", {}).get("spotify", ""),
+                "color": "#ff3c64",  # Default accent color
+            }
+        )
 
-    logger.info(f"Spotify: got {len(tracks)} tracks for genre={seed_genre}, market={market}")
+    logger.info(
+        f"Spotify: got {len(tracks)} tracks for genre={seed_genre}, market={market}"
+    )
     return tracks
 
 
@@ -260,10 +294,20 @@ async def _search_artist(token: str, name: str) -> str | None:
 def _get_market_from_languages(languages: list[str]) -> str:
     """Map language preferences to Spotify market codes."""
     lang_market = {
-        "English": "US", "Hindi": "IN", "Spanish": "ES", "Korean": "KR",
-        "Japanese": "JP", "French": "FR", "Tamil": "IN", "Telugu": "IN",
-        "Punjabi": "IN", "Arabic": "SA", "Portuguese": "BR", "German": "DE",
-        "Italian": "IT", "Mandarin": "TW",
+        "English": "US",
+        "Hindi": "IN",
+        "Spanish": "ES",
+        "Korean": "KR",
+        "Japanese": "JP",
+        "French": "FR",
+        "Tamil": "IN",
+        "Telugu": "IN",
+        "Punjabi": "IN",
+        "Arabic": "SA",
+        "Portuguese": "BR",
+        "German": "DE",
+        "Italian": "IT",
+        "Mandarin": "TW",
     }
     if languages:
         return lang_market.get(languages[0], "US")

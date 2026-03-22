@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StarfieldCanvas from "../../components/StarfieldCanvas";
+import useAuthStore from "../../stores/useAuthStore";
 import "./DashboardPage.css";
 
 const MOCK_PLAYLISTS = [
@@ -74,6 +75,9 @@ const MOCK_PLAYLISTS = [
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const displayName = user?.username || "User";
+  const displayInitial = displayName.charAt(0).toUpperCase();
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("account");
@@ -90,7 +94,8 @@ export default function DashboardPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await logout();
     navigate("/auth");
   };
 
@@ -120,10 +125,10 @@ export default function DashboardPage() {
               aria-label="User profile menu"
             >
               <div className="db-avatar">
-                <span>U</span>
+                <span>{displayInitial}</span>
                 <div className="db-avatar-ring" />
               </div>
-              <span className="db-username">User</span>
+              <span className="db-username">{displayName}</span>
               <svg
                 className={`db-chevron ${profileOpen ? "db-chevron--open" : ""}`}
                 width="12"
@@ -138,10 +143,10 @@ export default function DashboardPage() {
             {profileOpen && (
               <div className="db-dropdown">
                 <div className="db-dropdown-header">
-                  <div className="db-dropdown-avatar">U</div>
+                  <div className="db-dropdown-avatar">{displayInitial}</div>
                   <div>
-                    <p className="db-dropdown-name">User</p>
-                    <p className="db-dropdown-email">user@sonar.app</p>
+                    <p className="db-dropdown-name">{displayName}</p>
+                    <p className="db-dropdown-email">@{displayName}</p>
                   </div>
                 </div>
                 <div className="db-dropdown-divider" />
@@ -314,19 +319,19 @@ export default function DashboardPage() {
                   <div className="db-settings-section">
                     <h3>Account Details</h3>
                     <div className="db-settings-row">
-                      <div className="db-settings-avatar-big">U</div>
+                      <div className="db-settings-avatar-big">{displayInitial}</div>
                       <div>
-                        <p className="db-settings-name">User</p>
+                        <p className="db-settings-name">{displayName}</p>
                         <button className="db-settings-change-avatar">Change avatar</button>
                       </div>
                     </div>
                     <div className="db-settings-field">
                       <label>Username</label>
-                      <input type="text" defaultValue="User" />
+                      <input type="text" defaultValue={displayName} />
                     </div>
                     <div className="db-settings-field">
                       <label>Email</label>
-                      <input type="email" defaultValue="user@sonar.app" />
+                      <input type="email" placeholder="No email set" />
                     </div>
                     <button className="db-settings-save">Save Changes</button>
                     <div className="db-settings-danger-zone">

@@ -6,6 +6,7 @@ import DashboardPage from "../pages/Dashboard/DashboardPage";
 import AnalyzePage from "../pages/Analyze/AnalyzePage";
 import ResultPage from "../pages/Result/ResultPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,9 +24,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/analyze" element={<AnalyzePage />} />
-          <Route path="/result" element={<ResultPage />} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/analyze" element={<ProtectedRoute><AnalyzePage /></ProtectedRoute>} />
+          <Route path="/result" element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>

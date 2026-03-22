@@ -104,3 +104,11 @@ export const authApi = {
 
   me: () => api.get("/auth/me"),
 };
+
+// Mood analysis API calls
+export const moodApi = {
+  analyze: (text) => api.post("/v1/mood/analyze", { text }),
+
+  playlist: (dimensions, preference) =>
+    api.post("/v1/mood/playlist", { dimensions, preference }),
+};

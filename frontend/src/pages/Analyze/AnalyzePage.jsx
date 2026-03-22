@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { moodApi } from "../../services/api";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import PageLayout from "../../components/PageLayout";
@@ -62,41 +63,58 @@ export default function AnalyzePage() {
     { pct: 100, label: "Playlist ready ✦" },
   ];
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     if (mode === "text" && !textInput.trim()) return;
     setAnalyzing(true);
     setProgress(0);
 
+    // Start the API call in parallel with progress animation
+    const apiPromise = moodApi.analyze(
+      mode === "text" ? textInput : "I was speaking about how I feel today"
+    );
+
+    // Animate progress stages while API works
     let stageIndex = 0;
     const runStage = () => {
-      if (stageIndex >= PROGRESS_STAGES.length) {
-        setTimeout(() => navigate("/result"), 600);
-        return;
-      }
-      const stage = PROGRESS_STAGES[stageIndex];
-      setProgressLabel(stage.label);
-
-      const startVal = stageIndex === 0 ? 0 : PROGRESS_STAGES[stageIndex - 1].pct;
-      const endVal = stage.pct;
-      const duration = stageIndex === PROGRESS_STAGES.length - 1 ? 700 : 500 + Math.random() * 400;
-      const startTime = performance.now();
-
-      const animate = (now) => {
-        const elapsed = now - startTime;
-        const t = Math.min(elapsed / duration, 1);
-        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-        setProgress(startVal + (endVal - startVal) * eased);
-        if (t < 1) {
-          progressRef.current = requestAnimationFrame(animate);
-        } else {
-          stageIndex++;
-          setTimeout(runStage, 200);
+      return new Promise((resolve) => {
+        if (stageIndex >= PROGRESS_STAGES.length) {
+          resolve();
+          return;
         }
-      };
-      progressRef.current = requestAnimationFrame(animate);
+        const stage = PROGRESS_STAGES[stageIndex];
+        setProgressLabel(stage.label);
+
+        const startVal = stageIndex === 0 ? 0 : PROGRESS_STAGES[stageIndex - 1].pct;
+        const endVal = stage.pct;
+        const duration = stageIndex === PROGRESS_STAGES.length - 1 ? 700 : 500 + Math.random() * 400;
+        const startTime = performance.now();
+
+        const animate = (now) => {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+          setProgress(startVal + (endVal - startVal) * eased);
+          if (t < 1) {
+            progressRef.current = requestAnimationFrame(animate);
+          } else {
+            stageIndex++;
+            setTimeout(() => resolve(runStage()), 200);
+          }
+        };
+        progressRef.current = requestAnimationFrame(animate);
+      });
     };
 
-    runStage();
+    try {
+      // Run animation and API call in parallel
+      const [analysisResult] = await Promise.all([apiPromise, runStage()]);
+      // Navigate to result with real data
+      setTimeout(() => navigate("/result", { state: { analysis: analysisResult } }), 400);
+    } catch (err) {
+      setAnalyzing(false);
+      setProgress(0);
+      alert(err.message || "Analysis failed. Please try again.");
+    }
   };
 
   const canAnalyze = mode === "text" ? textInput.trim().length > 0 : recordingTime > 0;

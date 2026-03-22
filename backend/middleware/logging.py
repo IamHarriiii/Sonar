@@ -34,11 +34,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         logger.info(f"{request.method} {request.url.path} started")
 
         import time
+
         start = time.perf_counter()
         response = await call_next(request)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        logger.info(f"{request.method} {request.url.path} → {response.status_code} ({elapsed_ms:.0f}ms)")
+        logger.info(
+            f"{request.method} {request.url.path} → {response.status_code} ({elapsed_ms:.0f}ms)"
+        )
 
         # Add request ID to response headers
         response.headers["X-Request-ID"] = rid
@@ -49,7 +52,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 def setup_logging(level: str = "INFO") -> None:
     """Configure structured logging with request ID."""
-    log_format = "%(asctime)s | %(levelname)-5s | %(request_id)s | %(name)s | %(message)s"
+    log_format = (
+        "%(asctime)s | %(levelname)-5s | %(request_id)s | %(name)s | %(message)s"
+    )
 
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S"))

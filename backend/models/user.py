@@ -30,7 +30,9 @@ class User(Base):
     )
 
     # Relationship to refresh tokens
-    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def to_dict(self):
         """Return user data safe for API responses (no password)."""

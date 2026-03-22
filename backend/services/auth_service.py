@@ -26,42 +26,56 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # ── JWT Tokens ──
 
+
 def create_access_token(user_id: uuid.UUID, username: str) -> str:
     """Create a short-lived access token (15 min default)."""
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
     payload = {
         "sub": str(user_id),
         "username": username,
         "type": "access",
         "exp": expire,
         "iat": datetime.now(timezone.utc),
+        "jti": uuid.uuid4().hex,
     }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def create_refresh_token(user_id: uuid.UUID) -> tuple[str, datetime]:
     """Create a long-lived refresh token (7 days default). Returns (token, expires_at)."""
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
     payload = {
         "sub": str(user_id),
         "type": "refresh",
         "exp": expires_at,
         "iat": datetime.now(timezone.utc),
+        "jti": uuid.uuid4().hex,
     }
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
     return token, expires_at
 
 
 def decode_token(token: str) -> dict | None:
     """Decode and verify a JWT token. Returns payload or None if invalid."""
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
         return payload
     except JWTError:
         return None
 
 
 # ── User operations (async) ──
+
 
 async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
     result = await db.execute(select(User).where(User.username == username))
@@ -86,7 +100,10 @@ async def create_user(db: AsyncSession, username: str, password: str) -> User:
 
 # ── Refresh token operations (async) ──
 
-async def store_refresh_token(db: AsyncSession, user_id: uuid.UUID, token: str, expires_at: datetime) -> RefreshToken:
+
+async def store_refresh_token(
+    db: AsyncSession, user_id: uuid.UUID, token: str, expires_at: datetime
+) -> RefreshToken:
     rt = RefreshToken(
         user_id=user_id,
         token=token,
@@ -108,9 +125,7 @@ async def get_refresh_token(db: AsyncSession, token: str) -> RefreshToken | None
 
 
 async def revoke_refresh_token(db: AsyncSession, token: str) -> bool:
-    result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token == token)
-    )
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token == token))
     rt = result.scalar_one_or_none()
     if rt:
         rt.is_revoked = True

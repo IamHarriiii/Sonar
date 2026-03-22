@@ -31,9 +31,13 @@ from limiter import limiter
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
 @limiter.limit("5/minute")
-async def signup(body: SignupRequest, request: Request, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+async def signup(
+    body: SignupRequest, request: Request, db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
     """Register a new user and return access + refresh tokens."""
     # Check if username is taken
     existing = await get_user_by_username(db, body.username)
@@ -62,7 +66,9 @@ async def signup(body: SignupRequest, request: Request, db: AsyncSession = Depen
 
 @router.post("/login", response_model=AuthResponse)
 @limiter.limit("5/minute")
-async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+async def login(
+    body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
     """Authenticate user and return access + refresh tokens."""
     user = await get_user_by_username(db, body.username)
     if not user or not verify_password(body.password, user.password_hash):
@@ -87,7 +93,9 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
 
 @router.post("/refresh", response_model=TokenRefreshResponse)
 @limiter.limit("10/minute")
-async def refresh_access_token(body: RefreshRequest, request: Request, db: AsyncSession = Depends(get_db)) -> TokenRefreshResponse:
+async def refresh_access_token(
+    body: RefreshRequest, request: Request, db: AsyncSession = Depends(get_db)
+) -> TokenRefreshResponse:
     """Use a valid refresh token to get a new access token."""
     # Decode the refresh token
     payload = decode_token(body.refresh_token)
@@ -106,7 +114,9 @@ async def refresh_access_token(body: RefreshRequest, request: Request, db: Async
         )
 
     # Check expiry
-    if stored_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+    if stored_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(
+        timezone.utc
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token has expired",

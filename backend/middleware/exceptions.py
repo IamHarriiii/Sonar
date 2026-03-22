@@ -9,7 +9,9 @@ from pydantic import ValidationError
 logger = logging.getLogger("sonar")
 
 
-async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+async def sqlalchemy_error_handler(
+    request: Request, exc: SQLAlchemyError
+) -> JSONResponse:
     """Handle database errors globally."""
     logger.error(f"Database error on {request.method} {request.url.path}: {exc}")
     return JSONResponse(
@@ -18,7 +20,9 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
     )
 
 
-async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+async def integrity_error_handler(
+    request: Request, exc: IntegrityError
+) -> JSONResponse:
     """Handle database constraint violations (unique, FK, etc.)."""
     logger.warning(f"Integrity error on {request.method} {request.url.path}: {exc}")
     return JSONResponse(
@@ -27,7 +31,9 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
     )
 
 
-async def validation_error_handler(request: Request, exc: ValidationError) -> JSONResponse:
+async def validation_error_handler(
+    request: Request, exc: ValidationError
+) -> JSONResponse:
     """Handle Pydantic validation errors that slip through."""
     logger.warning(f"Validation error on {request.method} {request.url.path}: {exc}")
     return JSONResponse(

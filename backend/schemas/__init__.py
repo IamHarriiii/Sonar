@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 # ── Request schemas ──
 
+
 class SignupRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
     password: str = Field(..., min_length=6, max_length=128)
@@ -22,6 +23,7 @@ class LogoutRequest(BaseModel):
 
 
 # ── Response schemas ──
+
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

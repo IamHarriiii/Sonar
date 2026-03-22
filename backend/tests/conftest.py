@@ -21,7 +21,9 @@ if TEST_DB_URL.startswith("postgresql://"):
     TEST_DB_URL = TEST_DB_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
-TestSessionLocal = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+TestSessionLocal = async_sessionmaker(
+    test_engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 @pytest.fixture(scope="session")

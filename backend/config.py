@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # ── AI Emotion Analysis (fallback: NVIDIA NIM → Groq → Together AI) ──
+    NVIDIA_NIM_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    TOGETHER_API_KEY: str = ""
+
+    # ── Spotify ──
+    SPOTIFY_CLIENT_ID: str = ""
+    SPOTIFY_CLIENT_SECRET: str = ""
+
     @property
     def cors_origin_list(self) -> List[str]:
         """Parse comma-separated CORS origins into a list."""

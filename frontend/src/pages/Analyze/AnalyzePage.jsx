@@ -173,7 +173,14 @@ export default function AnalyzePage() {
                 </div>
               ) : (
                 <div className="az-voice-panel">
-                  <div className="az-voice-visualizer">
+                  <div className={`az-voice-visualizer ${isRecording ? "az-voice-visualizer--active" : ""}`}>
+                    {/* Recording status badge */}
+                    <div className={`az-rec-status ${isRecording ? "az-rec-status--live" : ""}`}>
+                      <span className="az-rec-dot" />
+                      <span className="az-rec-text">{isRecording ? "RECORDING" : recordingTime > 0 ? "RECORDED" : "READY"}</span>
+                    </div>
+
+                    {/* Waveform visualizer */}
                     <div className="az-wave-bars">
                       {audioWave.map((h, i) => (
                         <div
@@ -181,50 +188,71 @@ export default function AnalyzePage() {
                           className="az-wave-bar"
                           style={{
                             height: `${h}px`,
-                            opacity: isRecording ? 0.7 + (h / 30) * 0.3 : 0.2,
+                            opacity: isRecording ? 0.6 + (h / 30) * 0.4 : 0.15,
                             background: isRecording
-                              ? `hsl(${340 + i * 2}, 80%, 60%)`
-                              : "rgba(255,255,255,0.2)",
-                            transition: isRecording ? "height 0.08s ease" : "all 0.3s ease",
+                              ? `linear-gradient(to top, hsl(${340 + i * 2}, 85%, 55%), hsl(${340 + i * 2}, 90%, 72%))`
+                              : "rgba(255,255,255,0.15)",
+                            transition: isRecording ? "height 0.06s ease" : "all 0.4s ease",
+                            boxShadow: isRecording && h > 15
+                              ? `0 0 ${Math.round(h / 4)}px hsl(${340 + i * 2}, 80%, 55%)`
+                              : "none",
                           }}
                         />
                       ))}
                     </div>
-                    <div className="az-voice-timer">{formatTime(recordingTime)}</div>
+
+                    {/* Timer */}
+                    <div className={`az-voice-timer ${isRecording ? "az-voice-timer--live" : ""}`}>
+                      {formatTime(recordingTime)}
+                    </div>
                   </div>
 
-                  <button
-                    className={`az-record-btn ${isRecording ? "az-record-btn--recording" : ""}`}
-                    onClick={() => {
-                      if (isRecording) {
-                        setIsRecording(false);
-                      } else {
-                        setRecordingTime(0);
-                        setIsRecording(true);
-                      }
-                    }}
-                    aria-label={isRecording ? "Stop recording" : "Start recording"}
-                  >
-                    <div className="az-record-btn-glow" />
-                    <div className="az-record-icon">
-                      {isRecording ? (
-                        <div className="az-stop-icon" />
-                      ) : (
-                        <svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor">
-                          <rect x="7" y="3" width="8" height="12" rx="4" />
-                          <path d="M4 11a7 7 0 0014 0M11 18v2M8 20h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="az-record-label">
-                      {isRecording ? "Tap to stop" : "Hold to record"}
-                    </span>
-                  </button>
+                  {/* Record button with ring animations */}
+                  <div className="az-record-wrap">
+                    {isRecording && (
+                      <>
+                        <div className="az-record-ring az-record-ring-1" />
+                        <div className="az-record-ring az-record-ring-2" />
+                        <div className="az-record-ring az-record-ring-3" />
+                      </>
+                    )}
+                    <button
+                      className={`az-record-btn ${isRecording ? "az-record-btn--recording" : ""}`}
+                      onClick={() => {
+                        if (isRecording) {
+                          setIsRecording(false);
+                        } else {
+                          setRecordingTime(0);
+                          setIsRecording(true);
+                        }
+                      }}
+                      aria-label={isRecording ? "Stop recording" : "Start recording"}
+                    >
+                      <div className="az-record-btn-glow" />
+                      <div className="az-record-icon">
+                        {isRecording ? (
+                          <div className="az-stop-icon" />
+                        ) : (
+                          <svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor">
+                            <rect x="7" y="3" width="8" height="12" rx="4" />
+                            <path d="M4 11a7 7 0 0014 0M11 18v2M8 20h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="az-record-label">
+                        {isRecording ? "Tap to stop" : "Tap to record"}
+                      </span>
+                    </button>
+                  </div>
 
                   {recordingTime > 0 && !isRecording && (
-                    <p className="az-voice-done">
-                      ✓ {formatTime(recordingTime)} recorded — ready to analyze
-                    </p>
+                    <div className="az-voice-done">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="8" r="7" stroke="#4ade80" strokeWidth="1.5" />
+                        <path d="M5 8l2 2 4-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>{formatTime(recordingTime)} captured — ready to analyze</span>
+                    </div>
                   )}
                 </div>
               )}

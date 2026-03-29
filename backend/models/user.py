@@ -2,18 +2,16 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import DateTime, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Uuid
 from database import Base
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
+        default=lambda: str(uuid.uuid4()),
     )
     username: Mapped[str] = mapped_column(
         String(50), unique=True, index=True, nullable=False

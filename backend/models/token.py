@@ -1,22 +1,20 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Boolean, ForeignKey, String, text
+from sqlalchemy import DateTime, Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Uuid
 from database import Base
 
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
+        default=lambda: str(uuid.uuid4()),
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token: Mapped[str] = mapped_column(
         String(512), unique=True, nullable=False, index=True

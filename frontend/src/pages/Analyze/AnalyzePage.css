@@ -508,6 +508,43 @@
   animation: fadeUp 0.3s ease both;
 }
 
+/* Transcribed text preview */
+.az-transcribed-preview {
+  margin-top: 12px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  animation: fadeUp 0.4s ease both;
+}
+
+.az-transcribed-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.25);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.az-transcribed-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  font-style: italic;
+  font-weight: 300;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Location hint */
+.az-location-hint {
+  font-size: 0.75rem;
+  color: rgba(74, 222, 128, 0.5);
+  text-align: center;
+  padding: 8px 0;
+  font-weight: 400;
+}
+
 /* ── Analyze Button ── */
 .az-analyze-btn {
   position: relative;

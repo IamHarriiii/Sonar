@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { moodApi } from "../../services/api";
 import Navbar from "../../components/Navbar";
@@ -16,25 +16,55 @@ export default function AnalyzePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioWave, setAudioWave] = useState(Array(40).fill(2));
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [transcribedText, setTranscribedText] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
 
   const timerRef = useRef(null);
   const waveRef = useRef(null);
   const progressRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const analyserRef = useRef(null);
 
-  // Recording timer
+  // Request geolocation once on mount (for weather)
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
+        () => {
+          // User denied or error — no weather, that's fine
+          setUserLocation(null);
+        },
+        { timeout: 5000, maximumAge: 300000 }
+      );
+    }
+  }, []);
+
+  // Real audio wave from MediaRecorder's analyser
+  const updateWaveFromAnalyser = useCallback(() => {
+    if (!analyserRef.current || !isRecording) return;
+    const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(data);
+    const step = Math.floor(data.length / 40);
+    const bars = Array(40).fill(0).map((_, i) => {
+      const val = data[i * step] || 0;
+      return Math.max(2, (val / 255) * 30);
+    });
+    setAudioWave(bars);
+  }, [isRecording]);
+
+  // Recording timer + wave animation
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
         setRecordingTime((t) => t + 1);
       }, 1000);
-      // Animate wave
-      waveRef.current = setInterval(() => {
-        setAudioWave(
-          Array(40)
-            .fill(0)
-            .map(() => Math.random() * 28 + 2)
-        );
-      }, 80);
+      waveRef.current = setInterval(updateWaveFromAnalyser, 80);
     } else {
       clearInterval(timerRef.current);
       clearInterval(waveRef.current);
@@ -46,12 +76,84 @@ export default function AnalyzePage() {
       clearInterval(timerRef.current);
       clearInterval(waveRef.current);
     };
-  }, [isRecording]);
+  }, [isRecording, updateWaveFromAnalyser]);
 
   const formatTime = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
     const sec = (s % 60).toString().padStart(2, "0");
     return `${m}:${sec}`;
+  };
+
+  // ── Start real recording ──
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // Set up analyser for real waveform
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // Set up MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm",
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setAudioBlob(blob);
+        // Stop all tracks
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      };
+
+      mediaRecorder.start(250); // Collect chunks every 250ms
+      setRecordingTime(0);
+      setIsRecording(true);
+      setAudioBlob(null);
+      setTranscribedText("");
+    } catch {
+      alert("Microphone access denied. Please allow microphone permissions.");
+    }
+  };
+
+  // ── Stop recording + auto-transcribe ──
+  const stopRecording = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+
+    // Wait briefly for onstop to fire and blob to be set
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Auto-transcribe
+    const chunks = audioChunksRef.current;
+    if (chunks.length > 0) {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      setTranscribing(true);
+      try {
+        const result = await moodApi.transcribe(blob);
+        setTranscribedText(result.text || "");
+      } catch (err) {
+        setTranscribedText("");
+        console.error("Transcription failed:", err);
+      } finally {
+        setTranscribing(false);
+      }
+    }
   };
 
   const PROGRESS_STAGES = [
@@ -64,13 +166,17 @@ export default function AnalyzePage() {
   ];
 
   const startAnalysis = async () => {
-    if (mode === "text" && !textInput.trim()) return;
+    const analysisText = mode === "text" ? textInput : transcribedText;
+    if (!analysisText || analysisText.trim().length < 10) return;
+
     setAnalyzing(true);
     setProgress(0);
 
-    // Start the API call in parallel with progress animation
+    // Start the API call with optional location for weather
     const apiPromise = moodApi.analyze(
-      mode === "text" ? textInput : "I was speaking about how I feel today"
+      analysisText,
+      userLocation?.lat || null,
+      userLocation?.lon || null
     );
 
     // Animate progress stages while API works
@@ -117,7 +223,9 @@ export default function AnalyzePage() {
     }
   };
 
-  const canAnalyze = mode === "text" ? textInput.trim().length > 0 : recordingTime > 0;
+  const canAnalyze = mode === "text"
+    ? textInput.trim().length >= 10
+    : (transcribedText.trim().length >= 10 || (recordingTime > 0 && !transcribing));
 
   return (
     <PageLayout>
@@ -195,7 +303,9 @@ export default function AnalyzePage() {
                     {/* Recording status badge */}
                     <div className={`az-rec-status ${isRecording ? "az-rec-status--live" : ""}`}>
                       <span className="az-rec-dot" />
-                      <span className="az-rec-text">{isRecording ? "RECORDING" : recordingTime > 0 ? "RECORDED" : "READY"}</span>
+                      <span className="az-rec-text">
+                        {isRecording ? "RECORDING" : transcribing ? "TRANSCRIBING..." : recordingTime > 0 ? "RECORDED" : "READY"}
+                      </span>
                     </div>
 
                     {/* Waveform visualizer */}
@@ -236,14 +346,8 @@ export default function AnalyzePage() {
                     )}
                     <button
                       className={`az-record-btn ${isRecording ? "az-record-btn--recording" : ""}`}
-                      onClick={() => {
-                        if (isRecording) {
-                          setIsRecording(false);
-                        } else {
-                          setRecordingTime(0);
-                          setIsRecording(true);
-                        }
-                      }}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={transcribing}
                       aria-label={isRecording ? "Stop recording" : "Start recording"}
                     >
                       <div className="az-record-btn-glow" />
@@ -258,12 +362,30 @@ export default function AnalyzePage() {
                         )}
                       </div>
                       <span className="az-record-label">
-                        {isRecording ? "Tap to stop" : "Tap to record"}
+                        {transcribing ? "Transcribing..." : isRecording ? "Tap to stop" : "Tap to record"}
                       </span>
                     </button>
                   </div>
 
-                  {recordingTime > 0 && !isRecording && (
+                  {/* Transcription result */}
+                  {transcribedText && !isRecording && (
+                    <div className="az-voice-done">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="8" r="7" stroke="#4ade80" strokeWidth="1.5" />
+                        <path d="M5 8l2 2 4-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>Transcribed — ready to analyze</span>
+                    </div>
+                  )}
+
+                  {transcribedText && (
+                    <div className="az-transcribed-preview">
+                      <div className="az-transcribed-label">What we heard:</div>
+                      <p className="az-transcribed-text">&ldquo;{transcribedText}&rdquo;</p>
+                    </div>
+                  )}
+
+                  {recordingTime > 0 && !isRecording && !transcribedText && !transcribing && (
                     <div className="az-voice-done">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <circle cx="8" cy="8" r="7" stroke="#4ade80" strokeWidth="1.5" />
@@ -276,11 +398,18 @@ export default function AnalyzePage() {
               )}
             </div>
 
+            {/* Location hint */}
+            {userLocation && (
+              <div className="az-location-hint">
+                🌤 Weather context enabled — your local weather will influence genre recommendations
+              </div>
+            )}
+
             {/* Analyze CTA */}
             <button
               className={`az-analyze-btn ${canAnalyze ? "az-analyze-btn--ready" : ""}`}
               onClick={startAnalysis}
-              disabled={!canAnalyze}
+              disabled={!canAnalyze || transcribing}
             >
               <div className="az-analyze-btn-glow" />
               <span>Analyze My Mood</span>

@@ -78,9 +78,7 @@ async def _deepgram_transcribe(
 
     data = response.json()
     alternatives = (
-        data.get("results", {})
-        .get("channels", [{}])[0]
-        .get("alternatives", [{}])
+        data.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])
     )
     if alternatives:
         return alternatives[0].get("transcript", "")

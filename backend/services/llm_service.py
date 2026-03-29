@@ -201,9 +201,7 @@ async def _call_llm(
     return json.loads(content)
 
 
-async def analyze_emotion(
-    text: str, weather_context: dict | None = None
-) -> dict:
+async def analyze_emotion(text: str, weather_context: dict | None = None) -> dict:
     """
     Analyze text emotion using LLM with fallback hierarchy.
 

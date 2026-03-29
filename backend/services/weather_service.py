@@ -15,12 +15,18 @@ logger = logging.getLogger("sonar.weather")
 
 # ── Weather → mood influence mapping ──
 WEATHER_MOODS = {
-    "Thunderstorm": {"mood_hint": "intense, dramatic", "genre_hint": "rock, electronic"},
+    "Thunderstorm": {
+        "mood_hint": "intense, dramatic",
+        "genre_hint": "rock, electronic",
+    },
     "Drizzle": {"mood_hint": "mellow, introspective", "genre_hint": "lo-fi, ambient"},
     "Rain": {"mood_hint": "reflective, cozy", "genre_hint": "indie folk, acoustic"},
     "Snow": {"mood_hint": "quiet, magical", "genre_hint": "classical, ambient"},
     "Clear": {"mood_hint": "uplifting, bright", "genre_hint": "pop, indie pop"},
-    "Clouds": {"mood_hint": "neutral, contemplative", "genre_hint": "alternative, chill"},
+    "Clouds": {
+        "mood_hint": "neutral, contemplative",
+        "genre_hint": "alternative, chill",
+    },
     "Mist": {"mood_hint": "ethereal, dreamy", "genre_hint": "ambient, trip-hop"},
     "Fog": {"mood_hint": "ethereal, dreamy", "genre_hint": "ambient, trip-hop"},
     "Haze": {"mood_hint": "lazy, hazy", "genre_hint": "lo-fi, chill"},
@@ -29,7 +35,10 @@ WEATHER_MOODS = {
     "Sand": {"mood_hint": "restless, arid", "genre_hint": "world, folk"},
     "Ash": {"mood_hint": "dark, ominous", "genre_hint": "metal, dark ambient"},
     "Squall": {"mood_hint": "chaotic, powerful", "genre_hint": "punk, electronic"},
-    "Tornado": {"mood_hint": "intense, overwhelming", "genre_hint": "metal, industrial"},
+    "Tornado": {
+        "mood_hint": "intense, overwhelming",
+        "genre_hint": "metal, industrial",
+    },
 }
 
 
@@ -77,9 +86,7 @@ async def get_weather(lat: float, lon: float) -> dict | None:
             "genre_hint": mood_info["genre_hint"],
         }
 
-        logger.info(
-            f"✓ Weather: {city} — {weather_desc}, {temp}°C"
-        )
+        logger.info(f"✓ Weather: {city} — {weather_desc}, {temp}°C")
         return result
 
     except Exception as e:

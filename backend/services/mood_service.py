@@ -28,9 +28,7 @@ async def fetch_weather(lat: float, lon: float) -> dict | None:
     return await get_weather(lat, lon)
 
 
-async def analyze_mood(
-    text: str, weather_context: dict | None = None
-) -> dict:
+async def analyze_mood(text: str, weather_context: dict | None = None) -> dict:
     """Analyze text and return structured emotion analysis."""
     result = await analyze_emotion(text, weather_context)
 

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import PageLayout from "../../components/PageLayout";
+import usePlaylistStore from "../../stores/usePlaylistStore";
 import "./PlaylistPage.css";
 
 export default function PlaylistPage() {
@@ -10,14 +11,20 @@ export default function PlaylistPage() {
   const location = useLocation();
   const data = location.state;
   const [playingId, setPlayingId] = useState(null);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [saved, setSaved] = useState(false);
   const audioRef = useRef(null);
+  const progressTimer = useRef(null);
+  const { savePlaylist, isPlaylistSaved } = usePlaylistStore();
 
   // Redirect if accessed directly
   useEffect(() => {
     if (!data?.playlist) {
       navigate("/analyze", { replace: true });
+    } else {
+      setSaved(isPlaylistSaved(data.playlist.title));
     }
-  }, [data, navigate]);
+  }, [data, navigate, isPlaylistSaved]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -26,6 +33,7 @@ export default function PlaylistPage() {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      clearInterval(progressTimer.current);
     };
   }, []);
 
@@ -33,29 +41,51 @@ export default function PlaylistPage() {
     if (!track.preview_url) return;
 
     if (playingId === track.id) {
-      // Pause current
       audioRef.current?.pause();
       setPlayingId(null);
+      setAudioProgress(0);
+      clearInterval(progressTimer.current);
       return;
     }
 
-    // Stop previous
     if (audioRef.current) {
       audioRef.current.pause();
+      clearInterval(progressTimer.current);
     }
 
-    // Play new
     const audio = new Audio(track.preview_url);
     audio.volume = 0.5;
     audio.play();
-    audio.onended = () => setPlayingId(null);
+    audio.onended = () => {
+      setPlayingId(null);
+      setAudioProgress(0);
+      clearInterval(progressTimer.current);
+    };
     audioRef.current = audio;
     setPlayingId(track.id);
+
+    // Track progress for vinyl rotation
+    progressTimer.current = setInterval(() => {
+      if (audio.duration) {
+        setAudioProgress((audio.currentTime / audio.duration) * 100);
+      }
+    }, 100);
+  };
+
+  const handleSave = () => {
+    if (!data) return;
+    savePlaylist(data.playlist, data.analysis, data.preference, data.settings);
+    setSaved(true);
   };
 
   if (!data?.playlist) return null;
 
   const { playlist, analysis, preference, settings } = data;
+
+  // Find playing track for vinyl display
+  const playingTrack = playingId
+    ? playlist.tracks.find((t) => t.id === playingId)
+    : null;
 
   return (
     <PageLayout>
@@ -64,21 +94,68 @@ export default function PlaylistPage() {
       <main className="pl-main">
         <div className="pl-content">
 
-          {/* ── Hero ── */}
-          <section className="pl-hero">
-            <div className="pl-hero-orb">
-              <div className="pl-hero-ring pl-hero-ring-1" />
-              <div className="pl-hero-ring pl-hero-ring-2" />
-              <div className="pl-hero-core">
-                {analysis?.moodEmoji || "🎵"}
+          {/* ── Vinyl Player ── */}
+          <section className="pl-vinyl-section">
+            <div className={`pl-vinyl ${playingId ? "pl-vinyl--spinning" : ""}`}>
+              <div className="pl-vinyl-disc">
+                {/* Grooves */}
+                <div className="pl-vinyl-groove pl-vinyl-groove-1" />
+                <div className="pl-vinyl-groove pl-vinyl-groove-2" />
+                <div className="pl-vinyl-groove pl-vinyl-groove-3" />
+                <div className="pl-vinyl-groove pl-vinyl-groove-4" />
+                {/* Center label */}
+                <div className="pl-vinyl-label">
+                  {playingTrack?.album_art ? (
+                    <img
+                      src={playingTrack.album_art}
+                      alt=""
+                      className="pl-vinyl-label-art"
+                    />
+                  ) : (
+                    <div className="pl-vinyl-label-default">
+                      <span className="pl-vinyl-emoji">
+                        {analysis?.moodEmoji || "🎵"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Spindle */}
+                <div className="pl-vinyl-spindle" />
+              </div>
+              {/* Tonearm */}
+              <div className={`pl-tonearm ${playingId ? "pl-tonearm--active" : ""}`}>
+                <div className="pl-tonearm-base" />
+                <div className="pl-tonearm-arm" />
+                <div className="pl-tonearm-head" />
               </div>
             </div>
-            <h1 className="pl-hero-title">{playlist.title}</h1>
-            <p className="pl-hero-sub">
-              {playlist.tracks.length} tracks
-              {preference === "uplift" ? " • Uplifting" : " • Mood-matched"}
-              {settings?.languages?.length > 0 && ` • ${settings.languages.join(", ")}`}
-            </p>
+            {/* Now Playing */}
+            <div className="pl-now-playing">
+              {playingTrack ? (
+                <>
+                  <span className="pl-now-label">NOW PLAYING</span>
+                  <span className="pl-now-title">{playingTrack.title}</span>
+                  <span className="pl-now-artist">{playingTrack.artist}</span>
+                  <div className="pl-now-progress-track">
+                    <div
+                      className="pl-now-progress-fill"
+                      style={{ width: `${audioProgress}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="pl-now-label">
+                    {playlist.tracks.length} TRACKS
+                  </span>
+                  <span className="pl-now-title">{playlist.title}</span>
+                  <span className="pl-now-artist">
+                    {preference === "uplift" ? "Uplifting" : "Mood-matched"}
+                    {settings?.languages?.length > 0 && ` · ${settings.languages[0]}`}
+                  </span>
+                </>
+              )}
+            </div>
           </section>
 
           {/* ── Settings Summary ── */}
@@ -116,7 +193,6 @@ export default function PlaylistPage() {
                 >
                   <div className="pl-track-num">{String(i + 1).padStart(2, "0")}</div>
 
-                  {/* Album art or color accent */}
                   {track.album_art ? (
                     <img
                       src={track.album_art}
@@ -135,7 +211,6 @@ export default function PlaylistPage() {
 
                   <span className="pl-track-duration">{track.duration}</span>
 
-                  {/* Play/pause button — only if preview available */}
                   {track.preview_url ? (
                     <button
                       className={`pl-track-play ${playingId === track.id ? "pl-track-play--active" : ""}`}
@@ -177,6 +252,13 @@ export default function PlaylistPage() {
 
           {/* ── Actions ── */}
           <div className="pl-actions">
+            <button
+              className={`pl-action-btn pl-action-btn--save ${saved ? "pl-action-btn--saved" : ""}`}
+              onClick={handleSave}
+              disabled={saved}
+            >
+              {saved ? "✓ Saved to Dashboard" : "💾 Save to Dashboard"}
+            </button>
             <button
               className="pl-action-btn pl-action-btn--primary"
               onClick={() => navigate("/analyze")}

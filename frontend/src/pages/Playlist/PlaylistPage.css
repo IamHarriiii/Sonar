@@ -15,10 +15,10 @@
   gap: 2rem;
 }
 
-/* ── Hero ── */
-.pl-hero {
+/* ── Vinyl Player ── */
+.pl-vinyl-section {
   text-align: center;
-  padding: 1rem 0 0;
+  padding: 1.5rem 0;
   animation: plFadeUp 0.5s ease both;
 }
 
@@ -27,63 +27,204 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.pl-hero-orb {
+.pl-vinyl {
   position: relative;
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 1.4rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 1.5rem;
 }
 
-.pl-hero-ring {
-  position: absolute;
+.pl-vinyl-disc {
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 60, 100, 0.15);
+  background: radial-gradient(
+    circle,
+    #111 0%,
+    #0a0a0a 30%,
+    #1a1a1a 31%,
+    #0d0d0d 40%,
+    #1a1a1a 41%,
+    #0d0d0d 50%,
+    #1a1a1a 51%,
+    #0d0d0d 60%,
+    #1a1a1a 61%,
+    #0d0d0d 70%,
+    #1a1a1a 71%,
+    #111 100%
+  );
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.05),
+    0 4px 20px rgba(0, 0, 0, 0.6),
+    inset 0 0 30px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease;
+  position: relative;
 }
 
-.pl-hero-ring-1 {
-  inset: 0;
-  animation: plSpin 8s linear infinite;
+.pl-vinyl--spinning .pl-vinyl-disc {
+  animation: vinylSpin 2s linear infinite;
 }
 
-.pl-hero-ring-2 {
-  inset: 12px;
-  border-color: rgba(201, 109, 255, 0.2);
-  animation: plSpin 5s linear infinite reverse;
-}
-
-@keyframes plSpin {
+@keyframes vinylSpin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
 
-.pl-hero-core {
-  width: 52px;
-  height: 52px;
+/* Groove rings */
+.pl-vinyl-groove {
+  position: absolute;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255, 60, 100, 0.15), rgba(201, 109, 255, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+.pl-vinyl-groove-1 { inset: 18%; }
+.pl-vinyl-groove-2 { inset: 25%; }
+.pl-vinyl-groove-3 { inset: 32%; }
+.pl-vinyl-groove-4 { inset: 39%; }
+
+/* Center label */
+.pl-vinyl-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
-  box-shadow: 0 0 30px rgba(255, 60, 100, 0.15);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
-.pl-hero-title {
+.pl-vinyl-label-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.pl-vinyl-label-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.pl-vinyl-emoji {
+  font-size: 1.6rem;
+}
+
+/* Spindle hole */
+.pl-vinyl-spindle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #060608;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 5;
+}
+
+/* Tonearm */
+.pl-tonearm {
+  position: absolute;
+  top: -10px;
+  right: 20px;
+  width: 60px;
+  height: 120px;
+  transform-origin: 50px 10px;
+  transform: rotate(-30deg);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.pl-tonearm--active {
+  transform: rotate(0deg);
+}
+
+.pl-tonearm-base {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #333;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.pl-tonearm-arm {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 3px;
+  height: 90px;
+  background: linear-gradient(to bottom, #555, #333);
+  border-radius: 1.5px;
+  transform-origin: top center;
+  transform: rotate(-15deg);
+}
+
+.pl-tonearm-head {
+  position: absolute;
+  bottom: 15px;
+  left: 5px;
+  width: 10px;
+  height: 6px;
+  background: #666;
+  border-radius: 3px 3px 1px 1px;
+}
+
+/* Now Playing info */
+.pl-now-playing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pl-now-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(255, 60, 100, 0.5);
+}
+
+.pl-now-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  font-size: 1.3rem;
   font-weight: 700;
   color: #fff;
-  margin: 0 0 0.4rem;
 }
 
-.pl-hero-sub {
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 0.85rem;
+.pl-now-artist {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
   font-weight: 300;
-  margin: 0;
+}
+
+.pl-now-progress-track {
+  width: 160px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.pl-now-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff3c64, #ff6b8a);
+  border-radius: 2px;
+  transition: width 0.1s linear;
 }
 
 /* ── Settings Bar ── */
@@ -284,6 +425,24 @@
   transition: all 0.2s;
 }
 
+.pl-action-btn--save {
+  background: rgba(74, 222, 128, 0.06);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+.pl-action-btn--save:hover:not(:disabled) {
+  background: rgba(74, 222, 128, 0.12);
+  box-shadow: 0 4px 20px rgba(74, 222, 128, 0.15);
+}
+
+.pl-action-btn--saved {
+  background: rgba(74, 222, 128, 0.03);
+  border-color: rgba(74, 222, 128, 0.08);
+  color: rgba(74, 222, 128, 0.4);
+  cursor: default;
+}
+
 .pl-action-btn--primary {
   background: linear-gradient(135deg, #ff3c64, #e0245e);
   border: none;
@@ -309,6 +468,9 @@
 
 /* ── Responsive ── */
 @media (max-width: 600px) {
+  .pl-vinyl { width: 160px; height: 160px; }
+  .pl-vinyl-disc { width: 160px; height: 160px; }
+  .pl-vinyl-label { width: 55px; height: 55px; }
   .pl-settings-bar { flex-wrap: wrap; gap: 12px; }
   .pl-setting-divider { display: none; }
   .pl-actions { flex-direction: column; }

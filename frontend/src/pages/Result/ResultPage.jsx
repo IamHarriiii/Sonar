@@ -163,6 +163,24 @@ export default function ResultPage() {
             <p className="rp-genre-reason">{genre_reason}</p>
           </section>
 
+          {/* ── Weather Context (if available) ── */}
+          {analysisData.weather && (
+            <div className="rp-weather-bar">
+              <span className="rp-weather-icon">
+                {analysisData.weather.condition === "Rain" ? "🌧" :
+                 analysisData.weather.condition === "Clear" ? "☀️" :
+                 analysisData.weather.condition === "Clouds" ? "☁️" :
+                 analysisData.weather.condition === "Snow" ? "❄️" :
+                 analysisData.weather.condition === "Thunderstorm" ? "⛈" :
+                 analysisData.weather.condition === "Drizzle" ? "🌦" : "🌤"}
+              </span>
+              <span className="rp-weather-text">
+                {analysisData.weather.city} · {analysisData.weather.description} · {analysisData.weather.temp_c}°C
+              </span>
+              <span className="rp-weather-label">influenced your genre</span>
+            </div>
+          )}
+
           {/* ── Emotional Spectrum ── */}
           <section className="rp-spectrum-section">
             <h2 className="rp-spectrum-title">Emotional spectrum</h2>

@@ -43,7 +43,7 @@ async function request(endpoint, options = {}, _retried = false) {
 /**
  * Raw fetch with auth (for file uploads — no JSON content-type).
  */
-async function rawRequest(endpoint, options = {}) {
+async function rawRequest(endpoint, options = {}, _retried = false) {
   const url = `${API_URL}${endpoint}`;
   const token = localStorage.getItem("sonar_access_token");
 
@@ -57,6 +57,14 @@ async function rawRequest(endpoint, options = {}) {
   }
 
   const response = await fetch(url, config);
+
+  // Auto-refresh on 401 (only once to avoid infinite loops)
+  if (response.status === 401 && !_retried) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      return rawRequest(endpoint, options, true);
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({

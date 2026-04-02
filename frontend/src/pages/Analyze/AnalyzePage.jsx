@@ -146,10 +146,16 @@ export default function AnalyzePage() {
       setTranscribing(true);
       try {
         const result = await moodApi.transcribe(blob);
-        setTranscribedText(result.text || "");
+        if (result.text && result.text.trim().length > 0) {
+          setTranscribedText(result.text);
+        } else {
+          setTranscribedText("");
+          alert("Could not detect any speech. Please try again and speak clearly.");
+        }
       } catch (err) {
         setTranscribedText("");
         console.error("Transcription failed:", err);
+        alert(err.message || "Transcription failed. Please check your API keys and try again.");
       } finally {
         setTranscribing(false);
       }
@@ -225,7 +231,7 @@ export default function AnalyzePage() {
 
   const canAnalyze = mode === "text"
     ? textInput.trim().length >= 10
-    : (transcribedText.trim().length >= 10 || (recordingTime > 0 && !transcribing));
+    : transcribedText.trim().length >= 10;
 
   return (
     <PageLayout>

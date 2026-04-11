@@ -211,3 +211,20 @@ class SongPreferenceResponse(BaseModel):
 
 class SongPreferenceBatchResponse(BaseModel):
     preferences: dict[str, str]  # {song_key: "like"|"dislike"}
+
+
+# ── Chat schemas ──
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern=r"^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: list[ChatMessage] = Field(default=[])
+
+
+class ChatResponse(BaseModel):
+    response: str

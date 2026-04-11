@@ -185,3 +185,9 @@ export const moodApi = {
   getStream: (videoId) =>
     api.get(`/v1/mood/stream/${encodeURIComponent(videoId)}`),
 };
+
+// Chat API
+export const chatApi = {
+  sendMessage: (message, history = []) =>
+    api.post("/v1/chat/message", { message, history }),
+};

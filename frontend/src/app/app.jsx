@@ -5,6 +5,7 @@ import Snowfall from "react-snowfall";
 import LandingPage from "../pages/Landing/LandingPage";
 import AuthPage from "../pages/Auth/AuthPage";
 import ProtectedRoute from "../components/ProtectedRoute";
+import ChatWidget from "../components/ChatWidget";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
 
 // ── Code-split heavy pages (lazy load) ──
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
+        <ChatWidget />
       </BrowserRouter>
     </QueryClientProvider>
   );

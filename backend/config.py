@@ -4,7 +4,7 @@ from typing import List
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/sonar"
     JWT_SECRET_KEY: str = "sonar-super-secret-change-me-in-production"

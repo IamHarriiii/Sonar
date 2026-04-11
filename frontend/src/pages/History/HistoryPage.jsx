@@ -106,7 +106,7 @@ function EmotionRadar({ dimensions = [] }) {
   const dataPath = dataPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + "Z";
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="mh-radar-svg">
+    <svg viewBox={`0 0 ${size} ${size}`} className="mh-radar-svg" role="img" aria-label="Emotion radar chart showing distribution of Sadness, Joy, Anger, Fear, Calm, and Energy">
       {/* Grid levels */}
       {Array.from({ length: levels }, (_, i) => {
         const r = (maxR * (i + 1)) / levels;
@@ -221,7 +221,7 @@ function CalendarHeatmap({ data = [] }) {
   const height = 7 * (cellSize + gap) + 20;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="mh-cal-svg">
+    <svg viewBox={`0 0 ${width} ${height}`} className="mh-cal-svg" role="img" aria-label="Mood calendar heatmap showing analysis activity over the last 13 weeks">
       {/* Month labels */}
       {months.map((m, i) => (
         <text key={i} x={m.x} y={10} className="mh-cal-month">{m.label}</text>

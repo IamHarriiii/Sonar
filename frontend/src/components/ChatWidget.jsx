@@ -105,7 +105,7 @@ export default function ChatWidget() {
 
       {/* ── Chat Panel ── */}
       {isOpen && (
-        <div className="chat-panel">
+        <div className="chat-panel" role="dialog" aria-label="Chat with Sonar Companion">
           {/* Header */}
           <div className="chat-header">
             <div className="chat-header-left">
@@ -119,13 +119,13 @@ export default function ChatWidget() {
               </div>
             </div>
             <div className="chat-header-actions">
-              <button className="chat-header-btn" onClick={clearChat} title="Clear chat">
+              <button className="chat-header-btn" onClick={clearChat} title="Clear chat" aria-label="Clear chat history">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
                 </svg>
               </button>
-              <button className="chat-header-btn" onClick={() => setIsOpen(false)} title="Close">
+              <button className="chat-header-btn" onClick={() => setIsOpen(false)} title="Close" aria-label="Minimize chat">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
@@ -134,7 +134,7 @@ export default function ChatWidget() {
           </div>
 
           {/* Messages */}
-          <div className="chat-messages">
+          <div className="chat-messages" role="log" aria-label="Chat messages" aria-live="polite">
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -177,6 +177,7 @@ export default function ChatWidget() {
               className={`chat-send-btn ${input.trim() ? "chat-send-btn--active" : ""}`}
               onClick={sendMessage}
               disabled={!input.trim() || loading}
+              aria-label="Send message"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />

@@ -34,7 +34,7 @@ _A multimodal framework combining emotion recognition, uncertainty modeling, hyb
 Unlike traditional systems that treat emotions as deterministic labels with static mappings, SONAR **models uncertainty explicitly**, **adapts using real user feedback (RLHF)**, and remains **interpretable and robust** in noisy real-world inputs. The system includes an AI wellness companion chatbot with RAG over your emotional history, providing psychotherapy-informed conversational support.
 
 > [!NOTE]
-> The system design described below is **patent-pending**. For detailed technical insights, methodology, ablation studies, and experimental results, please refer to our **[conference paper](#)** and **[research journal](#)**.
+> The system design described below is **patent-pending**. For detailed technical insights, methodology, ablation studies, and experimental results, please refer to our **[conference paper](https://ieeexplore.ieee.org/document/11465594)** and **[research journal](#)**.
 
 ---
 
@@ -423,7 +423,7 @@ SONAR classifies emotions in a hierarchical structure:
 
 <div align="center">
 
-[![Conference Paper](https://img.shields.io/badge/📑_Conference_Paper-View_Publication-2563eb?style=for-the-badge)](#)
+[![Conference Paper](https://img.shields.io/badge/📑_Conference_Paper-View_Publication-2563eb?style=for-the-badge)](https://ieeexplore.ieee.org/document/11465594)
 &nbsp;&nbsp;
 [![Research Journal](https://img.shields.io/badge/📄_Research_Journal-Read_Full_Paper-7c3aed?style=for-the-badge)](#)
 &nbsp;&nbsp;

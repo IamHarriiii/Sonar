@@ -15,7 +15,7 @@ _A multimodal framework combining emotion recognition, uncertainty modeling, hyb
 
 <br/>
 
-[![Conference Paper](https://img.shields.io/badge/📑_Conference_Paper-View_Publication-2563eb?style=for-the-badge)](#)
+[![Conference Paper](https://img.shields.io/badge/📑_Conference_Paper-View_Publication-2563eb?style=for-the-badge)](https://ieeexplore.ieee.org/document/11465594)
 &nbsp;&nbsp;
 [![Research Journal](https://img.shields.io/badge/📄_Research_Journal-Read_Full_Paper-7c3aed?style=for-the-badge)](#)
 &nbsp;&nbsp;

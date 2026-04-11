@@ -180,4 +180,8 @@ export const moodApi = {
 
   getPreferences: (songKeys) =>
     api.post("/v1/mood/songs/preferences", { song_keys: songKeys }),
+
+  // Audio stream (on-demand extraction)
+  getStream: (videoId) =>
+    api.get(`/v1/mood/stream/${encodeURIComponent(videoId)}`),
 };

@@ -16,8 +16,6 @@ os.environ.setdefault("TOGETHER_API_KEY", "test-together-key")
 os.environ.setdefault("DEEPGRAM_API_KEY", "test-deepgram-key")
 os.environ.setdefault("ASSEMBLYAI_API_KEY", "test-assemblyai-key")
 os.environ.setdefault("OPENWEATHERMAP_API_KEY", "test-weather-key")
-os.environ.setdefault("SPOTIFY_CLIENT_ID", "test-spotify-id")
-os.environ.setdefault("SPOTIFY_CLIENT_SECRET", "test-spotify-secret")
 
 from config import get_settings  # noqa: E402
 

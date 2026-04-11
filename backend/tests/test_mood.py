@@ -1,11 +1,13 @@
 """Tests for mood analysis, transcription, playlist, and history API routes.
 
-Uses respx to mock external API calls (LLM providers, Deepgram, Spotify, Weather).
+Uses respx to mock external API calls (LLM providers, Deepgram, Weather)
+and unittest.mock to mock ytmusicapi for playlist generation.
 """
 
 import pytest
 import respx
 from httpx import Response
+from unittest.mock import patch, MagicMock
 
 
 # ── Helper: signup and return auth headers ──
@@ -64,41 +66,25 @@ def mock_all_llm_providers():
     )
 
 
-def mock_spotify():
-    """Mock Spotify token + recommendations endpoints."""
-    respx.post("https://accounts.spotify.com/api/token").mock(
-        return_value=Response(
-            200, json={"access_token": "mock_token", "token_type": "Bearer"}
-        )
-    )
-    respx.get("https://api.spotify.com/v1/recommendations").mock(
-        return_value=Response(
-            200,
-            json={
-                "tracks": [
-                    {
-                        "id": f"track_{i}",
-                        "name": f"Test Song {i}",
-                        "artists": [{"name": f"Artist {i}"}],
-                        "album": {
-                            "name": f"Album {i}",
-                            "images": [
-                                {
-                                    "url": f"https://img.example.com/{i}.jpg",
-                                    "width": 300,
-                                }
-                            ],
-                        },
-                        "preview_url": f"https://preview.example.com/{i}.mp3",
-                        "external_urls": {
-                            "spotify": f"https://open.spotify.com/track/{i}"
-                        },
-                        "duration_ms": 210000,
-                    }
-                    for i in range(5)
-                ]
-            },
-        ),
+def mock_ytmusic_search():
+    """Mock ytmusicapi.YTMusic.search() to return fake YouTube Music results."""
+    mock_results = [
+        {
+            "videoId": f"dQw4w9WgXc{i}",
+            "title": f"Test Song {i}",
+            "artists": [{"name": f"Artist {i}"}],
+            "thumbnails": [
+                {"url": f"https://i.ytimg.com/vi/thumb{i}/default.jpg", "width": 60},
+                {"url": f"https://i.ytimg.com/vi/thumb{i}/hqdefault.jpg", "width": 480},
+            ],
+            "duration": f"3:{20 + i:02d}",
+            "resultType": "song",
+        }
+        for i in range(10)
+    ]
+    return patch(
+        "services.ytmusic_service._get_client",
+        return_value=MagicMock(search=MagicMock(return_value=mock_results)),
     )
 
 
@@ -246,40 +232,40 @@ async def test_transcribe_unauthorized(client):
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_playlist_generation(client):
-    """Test playlist generation with mocked Spotify API."""
-    mock_spotify()
+    """Test playlist generation with mocked YouTube Music API."""
+    with mock_ytmusic_search():
+        headers = await signup_and_get_headers(client, "playlistuser")
 
-    headers = await signup_and_get_headers(client, "playlistuser")
-
-    response = await client.post(
-        "/v1/mood/playlist",
-        json={
-            "dimensions": [
-                {"name": "Energy", "value": 80, "color": "#ff3c64"},
-                {"name": "Joy", "value": 90, "color": "#ffcc00"},
-            ],
-            "preference": "match",
-            "languages": ["English"],
-            "artists": [],
-            "intensity": 60,
-            "track_count": 5,
-            "genre": "pop",
-            "base_emotion": "Joy",
-        },
-        headers=headers,
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "title" in data
-    assert "tracks" in data
-    assert len(data["tracks"]) > 0
-    # Each track should have required fields
-    track = data["tracks"][0]
-    assert "title" in track
-    assert "artist" in track
-    assert "duration" in track
+        response = await client.post(
+            "/v1/mood/playlist",
+            json={
+                "dimensions": [
+                    {"name": "Energy", "value": 80, "color": "#ff3c64"},
+                    {"name": "Joy", "value": 90, "color": "#ffcc00"},
+                ],
+                "preference": "match",
+                "languages": ["English"],
+                "artists": [],
+                "intensity": 60,
+                "track_count": 5,
+                "genre": "pop",
+                "base_emotion": "Joy",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "title" in data
+        assert "tracks" in data
+        assert len(data["tracks"]) > 0
+        # Each track should have required fields
+        track = data["tracks"][0]
+        assert "title" in track
+        assert "artist" in track
+        assert "duration" in track
+        assert "video_id" in track
+        assert "youtube_url" in track
 
 
 @pytest.mark.asyncio

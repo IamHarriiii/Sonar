@@ -29,6 +29,7 @@ from services.mood_service import (
     analyze_mood,
     fetch_weather,
     generate_playlist,
+    stream_audio,
     transcribe,
 )
 
@@ -219,7 +220,7 @@ async def get_playlist(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PlaylistResponse:
-    """Generate a Spotify playlist based on mood and user preferences."""
+    """Generate a YouTube Music playlist based on mood and user preferences."""
     playlist = await generate_playlist(
         body.dimensions,
         body.preference,
@@ -231,6 +232,22 @@ async def get_playlist(
         base_emotion=body.base_emotion,
     )
     return PlaylistResponse(**playlist)
+
+
+@router.get("/stream/{video_id}")
+@limiter.limit("30/minute")
+async def get_stream(
+    request: Request,
+    video_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Extract audio stream URL for a YouTube Music track (on-demand)."""
+    try:
+        audio_url = await stream_audio(video_id)
+        return {"audio_url": audio_url}
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=502, detail=f"Could not extract audio: {e}")
 
 
 # ══════════════════════════════════════

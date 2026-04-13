@@ -11,7 +11,7 @@ const INITIAL_MESSAGE = {
 };
 
 export default function ChatWidget() {
-  const { token } = useAuthStore();
+  const { accessToken } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
@@ -60,7 +60,7 @@ export default function ChatWidget() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ message: text, history }),
         signal: controller.signal,
@@ -105,7 +105,7 @@ export default function ChatWidget() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ message: text, history }),
         });
@@ -154,7 +154,7 @@ export default function ChatWidget() {
   };
 
   // Don't render if not authenticated (after all hooks)
-  if (!token) return null;
+  if (!accessToken) return null;
 
   return (
     <>

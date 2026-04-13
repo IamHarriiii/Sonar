@@ -123,7 +123,13 @@ def _build_search_queries(
 
     # Fallback
     if not raw_queries:
-        raw_queries = [{"query": f"{genre} {base_emotion} mood songs", "language": None, "artist": None}]
+        raw_queries = [
+            {
+                "query": f"{genre} {base_emotion} mood songs",
+                "language": None,
+                "artist": None,
+            }
+        ]
 
     # ── Distribute track_count evenly across queries ──
     per_query = max(1, track_count // len(raw_queries))
@@ -399,7 +405,9 @@ async def get_audio_stream_url(video_id: str) -> str:
                         audio_url = info.get("url", "")
                         if audio_url:
                             return audio_url
-                except Exception as err:  # pragma: no cover - network/extractor variability
+                except (
+                    Exception
+                ) as err:  # pragma: no cover - network/extractor variability
                     last_error = err
                     continue
         if last_error:

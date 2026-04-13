@@ -146,14 +146,22 @@ def _build_playlist_reason(
             artist_str = ", ".join(artists)
         else:
             artist_str = ", ".join(artists[:3]) + f" and {len(artists) - 3} more"
-        verb = "strictly matched" if match_mode == "strict" else "prioritized tracks from or similar to"
+        verb = (
+            "strictly matched"
+            if match_mode == "strict"
+            else "prioritized tracks from or similar to"
+        )
         parts.append(f"We {verb} {artist_str}.")
 
     if languages:
         if match_mode == "strict":
-            parts.append("Strict matching was enabled, so we favored exact language/artist alignment over diversity.")
+            parts.append(
+                "Strict matching was enabled, so we favored exact language/artist alignment over diversity."
+            )
         else:
-            parts.append("Smart matching was enabled to balance your selections with better discovery and track quality.")
+            parts.append(
+                "Smart matching was enabled to balance your selections with better discovery and track quality."
+            )
 
     return " ".join(parts)
 

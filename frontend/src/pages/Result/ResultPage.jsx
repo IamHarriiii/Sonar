@@ -46,6 +46,22 @@ export default function ResultPage() {
   const [artistDropdownOpen, setArtistDropdownOpen] = useState(false);
 
   const customRef = useRef(null);
+  const langDropdownRef = useRef(null);
+  const artistDropdownRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+        setLangDropdownOpen(false);
+      }
+      if (artistDropdownRef.current && !artistDropdownRef.current.contains(e.target)) {
+        setArtistDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Redirect if no analysis data
   useEffect(() => {
@@ -295,7 +311,7 @@ export default function ResultPage() {
               {/* Language Dropdown */}
               <div className="rp-field">
                 <label className="rp-field-label">Languages</label>
-                <div className="rp-dropdown">
+                <div className="rp-dropdown" ref={langDropdownRef}>
                   <button
                     className="rp-dropdown-trigger"
                     onClick={() => { setLangDropdownOpen(!langDropdownOpen); setArtistDropdownOpen(false); }}
@@ -331,7 +347,7 @@ export default function ResultPage() {
               {/* Artists Dropdown (based on selected languages) */}
               <div className="rp-field">
                 <label className="rp-field-label">Artists <span className="rp-field-opt">(optional)</span></label>
-                <div className="rp-dropdown">
+                <div className="rp-dropdown" ref={artistDropdownRef}>
                   <button
                     className="rp-dropdown-trigger"
                     onClick={() => { setArtistDropdownOpen(!artistDropdownOpen); setLangDropdownOpen(false); }}

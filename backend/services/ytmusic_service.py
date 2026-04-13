@@ -78,41 +78,43 @@ def _build_search_queries(
     """
     Build a list of (query, count) tuples for diverse search results.
 
-    Splits track_count across multiple queries for equal distribution.
+    Distributes track_count across ALL languages and ALL artists evenly.
     """
-    queries = []
     keywords = _EMOTION_KEYWORDS.get(base_emotion, ["mood"])
-
-    # Pick 3 diverse keyword sets for variety
     random.shuffle(keywords)
-    keyword_selection = keywords[:3] if len(keywords) >= 3 else keywords
 
-    # Build base queries
-    lang_tag = ""
-    if languages and languages[0].lower() != "english":
-        lang_tag = f" {languages[0]}"
+    langs = languages or ["English"]
+    raw_queries = []
 
-    for kw in keyword_selection:
-        queries.append(f"{genre} {kw}{lang_tag} songs")
+    # ── Per-language queries ──
+    for lang in langs:
+        lang_tag = "" if lang.lower() == "english" else f" {lang}"
 
-    # Add sub-emotion query if available
-    if sub_emotion and sub_emotion in _SUB_EMOTION_KEYWORDS:
-        queries.append(f"{genre} {_SUB_EMOTION_KEYWORDS[sub_emotion]}{lang_tag}")
+        # 1-2 keyword+genre queries per language
+        for kw in keywords[:2]:
+            raw_queries.append(f"{genre} {kw}{lang_tag} songs")
 
-    # Add artist-specific queries
+        # Sub-emotion query per language
+        if sub_emotion and sub_emotion in _SUB_EMOTION_KEYWORDS:
+            raw_queries.append(
+                f"{genre} {_SUB_EMOTION_KEYWORDS[sub_emotion]}{lang_tag}"
+            )
+
+    # ── Per-artist queries (ALL artists) ──
     if artists:
-        for artist in artists[:2]:
-            queries.append(f"{artist} {genre}{lang_tag}")
+        for artist in artists:
+            raw_queries.append(f"{artist} {genre}")
 
-    # Distribute track_count evenly across queries
-    if not queries:
-        queries = [f"{genre} {base_emotion} mood songs"]
+    # Fallback
+    if not raw_queries:
+        raw_queries = [f"{genre} {base_emotion} mood songs"]
 
-    per_query = max(3, track_count // len(queries))
-    remainder = track_count - (per_query * len(queries))
+    # ── Distribute track_count evenly across queries ──
+    per_query = max(2, track_count // len(raw_queries))
+    remainder = track_count - (per_query * len(raw_queries))
 
     result = []
-    for i, q in enumerate(queries):
+    for i, q in enumerate(raw_queries):
         count = per_query + (1 if i < remainder else 0)
         if count > 0:
             result.append((q, count))

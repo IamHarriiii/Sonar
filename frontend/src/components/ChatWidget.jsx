@@ -209,29 +209,30 @@ export default function ChatWidget() {
 
           {/* Messages */}
           <div className="chat-messages" role="log" aria-label="Chat messages" aria-live="polite">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`chat-msg ${msg.role === "user" ? "chat-msg--user" : "chat-msg--bot"}`}
-              >
-                {msg.role === "assistant" && (
-                  <div className="chat-msg-avatar">🧠</div>
-                )}
-                <div className="chat-msg-bubble">
-                  <p className="chat-msg-text">{msg.content}</p>
+            {messages.map((msg, i) => {
+              const isEmptyStreaming = loading && msg.role === "assistant" && msg.content === "" && i === messages.length - 1;
+              return (
+                <div
+                  key={i}
+                  className={`chat-msg ${msg.role === "user" ? "chat-msg--user" : "chat-msg--bot"}`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="chat-msg-avatar">🧠</div>
+                  )}
+                  <div className={`chat-msg-bubble ${isEmptyStreaming ? "chat-msg-bubble--typing" : ""}`}>
+                    {isEmptyStreaming ? (
+                      <>
+                        <span className="chat-typing-dot" />
+                        <span className="chat-typing-dot" />
+                        <span className="chat-typing-dot" />
+                      </>
+                    ) : (
+                      <p className="chat-msg-text">{msg.content}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {loading && messages[messages.length - 1]?.content === "" && (
-              <div className="chat-msg chat-msg--bot">
-                <div className="chat-msg-avatar">🧠</div>
-                <div className="chat-msg-bubble chat-msg-bubble--typing">
-                  <span className="chat-typing-dot" />
-                  <span className="chat-typing-dot" />
-                  <span className="chat-typing-dot" />
-                </div>
-              </div>
-            )}
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
 

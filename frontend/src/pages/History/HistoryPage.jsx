@@ -389,9 +389,9 @@ export default function HistoryPage() {
               </button>
             </div>
           ) : (
-            <>
-              {/* ── Animated Stat Cards ── */}
-              <div className="mh-stats-grid">
+            <div className="mh-dashboard-grid">
+              {/* ── Stats + Week Comparison Row ── */}
+              <div className="mh-stats-grid mh-grid-span-left">
                 <div className="mh-stat-card">
                   <span className="mh-stat-label">Total Analyses</span>
                   <span className="mh-stat-value">{animTotal}</span>
@@ -414,7 +414,7 @@ export default function HistoryPage() {
 
               {/* ── Week-over-Week Comparison ── */}
               {stats.week_comparison && (
-                <div className="mh-wow-card">
+                <div className="mh-wow-card mh-grid-span-right">
                   <h3 className="mh-wow-title">📊 This Week vs Last Week</h3>
                   <div className="mh-wow-grid">
                     <DeltaBadge value={stats.week_comparison.confidence_delta} label="Confidence" unit="%" />
@@ -432,7 +432,7 @@ export default function HistoryPage() {
 
               {/* ── Calendar Heatmap ── */}
               {stats.calendar_data && (
-                <div className="mh-chart-card">
+                <div className="mh-chart-card mh-grid-full">
                   <h3 className="mh-chart-title">🗓️ Mood Calendar</h3>
                   <p className="mh-chart-desc">Your analysis activity over the last 13 weeks</p>
                   <div className="mh-cal-wrap">
@@ -452,8 +452,8 @@ export default function HistoryPage() {
                 </div>
               )}
 
-              {/* ── Row: Radar + Pie ── */}
-              <div className="mh-chart-row">
+              {/* ── Row: Radar + Pie + Confidence ── */}
+              <div className="mh-chart-row mh-grid-full">
                 {/* Emotion Radar */}
                 {radarDims && (
                   <div className="mh-chart-card mh-chart-card--half">
@@ -509,7 +509,7 @@ export default function HistoryPage() {
               </div>
 
               {/* ── Confidence + Energy Trend ── */}
-              <div className="mh-chart-card">
+              <div className="mh-chart-card mh-grid-half">
                 <h3 className="mh-chart-title">📈 Confidence & Energy Trend</h3>
                 <p className="mh-chart-desc">How your analysis confidence and energy levels change over time</p>
                 <div className="mh-chart-wrap">
@@ -554,7 +554,7 @@ export default function HistoryPage() {
               </div>
 
               {/* ── Valence Trend ── */}
-              <div className="mh-chart-card">
+              <div className="mh-chart-card mh-grid-half">
                 <h3 className="mh-chart-title">💚 Valence (Happiness)</h3>
                 <p className="mh-chart-desc">Higher = more positive emotional state</p>
                 <div className="mh-chart-wrap">
@@ -630,7 +630,7 @@ export default function HistoryPage() {
                   ))}
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </main>

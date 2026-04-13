@@ -360,20 +360,51 @@ async def get_audio_stream_url(video_id: str) -> str:
     """
     import yt_dlp
 
-    url = f"https://music.youtube.com/watch?v={video_id}"
+    url_candidates = [
+        f"https://music.youtube.com/watch?v={video_id}",
+        f"https://www.youtube.com/watch?v={video_id}",
+        f"https://youtu.be/{video_id}",
+    ]
 
-    ydl_opts = {
+    base_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
         "skip_download": True,
+        "noplaylist": True,
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+        },
     }
 
-    def _extract():
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return info.get("url", "")
+    option_sets = [
+        base_opts,
+        {
+            **base_opts,
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        },
+    ]
+
+    def _extract() -> str:
+        last_error = None
+        for source_url in url_candidates:
+            for opts in option_sets:
+                try:
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(source_url, download=False)
+                        audio_url = info.get("url", "")
+                        if audio_url:
+                            return audio_url
+                except Exception as err:  # pragma: no cover - network/extractor variability
+                    last_error = err
+                    continue
+        if last_error:
+            raise last_error
+        return ""
 
     audio_url = await asyncio.to_thread(_extract)
 

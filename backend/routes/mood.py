@@ -407,7 +407,16 @@ async def get_song_preferences(
     current_user: User = Depends(get_current_user),
 ) -> SongPreferenceBatchResponse:
     """Get preferences for a batch of song keys. Body: {"song_keys": [...]}"""
-    song_keys = body.get("song_keys", [])
+    raw_song_keys = body.get("song_keys", [])
+    if not isinstance(raw_song_keys, list):
+        return SongPreferenceBatchResponse(preferences={})
+
+    # Defensive normalization to prevent DB errors from malformed payloads.
+    song_keys = [
+        str(k).strip()[:255]
+        for k in raw_song_keys
+        if isinstance(k, str) and str(k).strip()
+    ]
     if not song_keys:
         return SongPreferenceBatchResponse(preferences={})
 

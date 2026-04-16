@@ -356,7 +356,7 @@
 /* ── Heatmap + recent row ── */
 .mh-heatmap-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   gap: 12px;
 }
 

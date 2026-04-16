@@ -373,12 +373,15 @@ async def get_audio_stream_url(video_id: str) -> str:
     ]
 
     base_opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
         "skip_download": True,
         "noplaylist": True,
+        "socket_timeout": 20,
+        "retries": 2,
+        "fragment_retries": 3,
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

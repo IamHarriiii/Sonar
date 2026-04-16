@@ -323,12 +323,16 @@ async def get_stream(
     current_user: User = Depends(get_current_user),
 ):
     """Extract audio stream URL for a YouTube Music track (on-demand)."""
+    import asyncio
     try:
-        audio_url = await stream_audio(video_id)
+        # Add timeout to prevent 504 errors
+        audio_url = await asyncio.wait_for(stream_audio(video_id), timeout=25.0)
         return {"audio_url": audio_url}
+    except asyncio.TimeoutError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=504, detail="Audio extraction timed out. Please try again.")
     except Exception as e:
         from fastapi import HTTPException
-
         raise HTTPException(status_code=502, detail=f"Could not extract audio: {e}")
 
 

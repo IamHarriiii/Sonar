@@ -75,6 +75,7 @@
 .mh-accent {
   background: linear-gradient(90deg, #ff6b8a, #c96dff);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 

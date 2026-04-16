@@ -10,7 +10,7 @@ set -e
 S3_BUCKET="sonar-music-frontend-199702507675-ap-south-1-an"
 CLOUDFRONT_DIST_ID="EDZ362DZNB32Q"
 EC2_IP="13.204.145.132"
-EC2_KEY="~/Downloads/Sonar-Key_EC2.pem"
+EC2_KEY="$HOME/Downloads/Sonar-Key_EC2.pem"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 RED='\033[0;31m'

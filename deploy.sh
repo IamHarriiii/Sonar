@@ -41,7 +41,7 @@ deploy_backend() {
     cd /opt/sonar
     git pull origin main
     cd backend
-    source venv/bin/activate
+    source sonarvenv/bin/activate
     pip install -r requirements.txt --quiet
     python3.11 -m alembic upgrade head
     sudo systemctl restart sonar-api

@@ -398,7 +398,7 @@ async def get_audio_stream_url(video_id: str) -> str:
     }
 
     option_sets = [
-        base_opts,
+        # Try with PO tokens and multiple browsers
         {
             **base_opts,
             "extractor_args": {
@@ -429,26 +429,55 @@ async def get_audio_stream_url(video_id: str) -> str:
             },
             "cookiesfrombrowser": ("safari",),
         },
+        # Try with different player clients
         {
             **base_opts,
             "extractor_args": {
-                "youtube": {"player_client": ["web"], "po_token_ver": "2"}
+                "youtube": {
+                    "player_client": ["web"],
+                    "po_token_ver": "2",
+                }
             },
             "cookiesfrombrowser": ("chrome",),
         },
         {
             **base_opts,
             "extractor_args": {
-                "youtube": {"player_client": ["android"], "po_token_ver": "2"}
+                "youtube": {
+                    "player_client": ["android"],
+                    "po_token_ver": "2",
+                }
             },
             "cookiesfrombrowser": ("chrome",),
         },
         {
             **base_opts,
             "extractor_args": {
-                "youtube": {"player_client": ["ios"], "po_token_ver": "2"}
+                "youtube": {
+                    "player_client": ["ios"],
+                    "po_token_ver": "2",
+                }
             },
             "cookiesfrombrowser": ("chrome",),
+        },
+        # Try without PO tokens
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web", "ios", "mweb"],
+                }
+            },
+            "cookiesfrombrowser": ("chrome",),
+        },
+        # Android only without cookies
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android"],
+                }
+            },
         },
     ]
 
@@ -514,6 +543,33 @@ async def get_audio_stream_url(video_id: str) -> str:
         except Exception as no_auth_err:
             logger.error(f"yt-dlp no-auth fallback failed for {video_id}: {str(no_auth_err)[:100]}")
             last_error = no_auth_err
+        
+        # Final attempt: use mweb player client which is less strict
+        try:
+            mweb_opts = {
+                "format": "bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["mweb"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+                },
+            }
+            with yt_dlp.YoutubeDL(mweb_opts) as ydl:
+                info = ydl.extract_info(url_candidates[0], download=False)
+                audio_url = info.get("url", "")
+                if audio_url:
+                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using mweb fallback")
+                    return audio_url
+        except Exception as mweb_err:
+            logger.error(f"yt-dlp mweb fallback failed for {video_id}: {str(mweb_err)[:100]}")
+            last_error = mweb_err
 
         if last_error:
             raise last_error

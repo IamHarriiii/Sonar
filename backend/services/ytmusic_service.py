@@ -445,7 +445,7 @@ async def get_audio_stream_url(video_id: str) -> str:
     import os
     
     # Check if cookie file exists for deployed server
-    cookie_file = "/app/cookies.txt"  # Path on deployed server
+    cookie_file = os.environ.get("YT_COOKIE_FILE", "/opt/sonar/backend/cookies.txt")
     has_cookie_file = os.path.exists(cookie_file)
     
     if has_cookie_file:

@@ -322,7 +322,7 @@
 
 /* ══════════ CHART CARDS ══════════ */
 .mh-chart-card {
-  padding: 24px;
+  padding: 20px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -339,7 +339,7 @@
 .mh-chart-desc {
   font-size: 0.76rem;
   color: rgba(255, 255, 255, 0.2);
-  margin: 0 0 20px;
+  margin: 0 0 12px;
 }
 
 .mh-chart-wrap { width: 100%; }
@@ -351,7 +351,9 @@
   gap: 12px;
 }
 
-.mh-chart-card--half { padding: 20px; }
+.mh-chart-card--half {
+  padding: 16px;
+}
 
 /* ── Heatmap + recent row ── */
 .mh-heatmap-row {
@@ -454,7 +456,7 @@
 .mh-pie-wrap {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 }
 
 .mh-pie-legend {

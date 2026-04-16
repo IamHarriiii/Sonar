@@ -489,154 +489,88 @@ async def get_audio_stream_url(video_id: str) -> str:
         },
     ])
 
-    def _extract() -> str:
-        last_error = None
-        for source_url in url_candidates:
-            for opts in option_sets:
-                try:
-                    with yt_dlp.YoutubeDL(opts) as ydl:
-                        info = ydl.extract_info(source_url, download=False)
-                        audio_url = info.get("url", "")
-                        if audio_url:
-                            return audio_url
-                except (
-                    Exception
-                ) as err:  # pragma: no cover - network/extractor variability
-                    logger.warning(
-                        f"yt-dlp extraction failed for {video_id}: {str(err)[:100]}"
-                    )
-                    last_error = err
-                    continue
-
-        # Final fallback with minimal options
+    def _extract_single(url: str, opts: dict) -> str:
+        """Single extraction attempt with timeout"""
         try:
-            fallback_opts = {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "extractor_args": {"youtube": {"player_client": ["web"]}},
-            }
-            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
-                info = ydl.extract_info(url_candidates[0], download=False)
+            # Add individual attempt timeout
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Extraction timeout")
+            
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(8)  # 8 second timeout per attempt
+            
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
                 audio_url = info.get("url", "")
                 if audio_url:
                     return audio_url
-        except Exception as fallback_err:
-            logger.error(
-                f"yt-dlp fallback failed for {video_id}: {str(fallback_err)[:100]}"
-            )
-            last_error = fallback_err
+        except TimeoutError:
+            logger.warning(f"yt-dlp timeout for {video_id}")
+            return ""
+        except Exception as err:
+            logger.warning(f"yt-dlp extraction failed for {video_id}: {str(err)[:100]}")
+            return ""
+        finally:
+            signal.alarm(0)  # Cancel timeout
         
-        # Additional fallback: try without any authentication
-        try:
-            no_auth_opts = {
+        return ""
+
+    def _extract() -> str:
+        last_error = None
+        
+        # Try primary methods first (most likely to succeed)
+        if has_cookie_file and option_sets:
+            for opts in option_sets[:2]:  # Try first 2 cookie-based options
+                for url in url_candidates[:1]:  # Try only main YouTube URL
+                    result = _extract_single(url, opts)
+                    if result:
+                        return result
+        
+        # Fallback to no-cookie methods
+        no_cookie_opts = [opts for opts in option_sets if "cookiefile" not in opts]
+        if no_cookie_opts:
+            for opts in no_cookie_opts[:2]:  # Try first 2 no-cookie options
+                for url in url_candidates[:1]:
+                    result = _extract_single(url, opts)
+                    if result:
+                        return result
+
+        # Quick fallback attempts (single attempt each)
+        fallback_attempts = [
+            # Minimal web client
+            {
                 "format": "bestaudio/best",
                 "quiet": True,
                 "no_warnings": True,
                 "skip_download": True,
                 "noplaylist": True,
+                "socket_timeout": 5,
+                "extractor_args": {"youtube": {"player_client": ["web"]}},
+            },
+            # Android mobile
+            {
+                "format": "bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "socket_timeout": 5,
                 "extractor_args": {"youtube": {"player_client": ["android"]}},
                 "http_headers": {
                     "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36",
                 },
-            }
-            with yt_dlp.YoutubeDL(no_auth_opts) as ydl:
-                info = ydl.extract_info(url_candidates[0], download=False)
-                audio_url = info.get("url", "")
-                if audio_url:
-                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using no-auth fallback")
-                    return audio_url
-        except Exception as no_auth_err:
-            logger.error(f"yt-dlp no-auth fallback failed for {video_id}: {str(no_auth_err)[:100]}")
-            last_error = no_auth_err
+            },
+        ]
         
-        # Final attempt: use mweb player client which is less strict
-        try:
-            mweb_opts = {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["mweb"],
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-                },
-            }
-            with yt_dlp.YoutubeDL(mweb_opts) as ydl:
-                info = ydl.extract_info(url_candidates[0], download=False)
-                audio_url = info.get("url", "")
-                if audio_url:
-                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using mweb fallback")
-                    return audio_url
-        except Exception as mweb_err:
-            logger.error(f"yt-dlp mweb fallback failed for {video_id}: {str(mweb_err)[:100]}")
-            last_error = mweb_err
+        for fallback_opts in fallback_attempts:
+            result = _extract_single(url_candidates[0], fallback_opts)
+            if result:
+                return result
         
-        # TV client fallback (often less restricted)
-        try:
-            tv_opts = {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["tv"],
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.122 Safari/537.36 WebAppManager",
-                },
-            }
-            with yt_dlp.YoutubeDL(tv_opts) as ydl:
-                info = ydl.extract_info(url_candidates[0], download=False)
-                audio_url = info.get("url", "")
-                if audio_url:
-                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using TV fallback")
-                    return audio_url
-        except Exception as tv_err:
-            logger.error(f"yt-dlp TV fallback failed for {video_id}: {str(tv_err)[:100]}")
-            last_error = tv_err
-        
-        # Music app client fallback
-        try:
-            music_opts = {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["music"],
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/89.0.4389.105 Mobile Safari/537.36",
-                    "Referer": "https://music.youtube.com/",
-                },
-            }
-            with yt_dlp.YoutubeDL(music_opts) as ydl:
-                info = ydl.extract_info(url_candidates[0], download=False)
-                audio_url = info.get("url", "")
-                if audio_url:
-                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using music app fallback")
-                    return audio_url
-        except Exception as music_err:
-            logger.error(f"yt-dlp music app fallback failed for {video_id}: {str(music_err)[:100]}")
-            last_error = music_err
-
-        if last_error:
-            raise last_error
-        return ""
+        # If all attempts failed, raise the last error
+        raise Exception("All extraction attempts failed or timed out")
 
     audio_url = await asyncio.to_thread(_extract)
 

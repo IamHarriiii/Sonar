@@ -326,7 +326,7 @@ async def get_stream(
     import asyncio
     try:
         # Add timeout to prevent 504 errors
-        audio_url = await asyncio.wait_for(stream_audio(video_id), timeout=25.0)
+        audio_url = await asyncio.wait_for(stream_audio(video_id), timeout=15.0)
         return {"audio_url": audio_url}
     except asyncio.TimeoutError:
         from fastapi import HTTPException

@@ -367,9 +367,8 @@ async def get_audio_stream_url(video_id: str) -> str:
     import yt_dlp
 
     url_candidates = [
-        f"https://music.youtube.com/watch?v={video_id}",
         f"https://www.youtube.com/watch?v={video_id}",
-        f"https://youtu.be/{video_id}",
+        f"https://music.youtube.com/watch?v={video_id}",
     ]
 
     base_opts = {
@@ -379,9 +378,10 @@ async def get_audio_stream_url(video_id: str) -> str:
         "extract_flat": False,
         "skip_download": True,
         "noplaylist": True,
-        "socket_timeout": 20,
-        "retries": 2,
-        "fragment_retries": 3,
+        "socket_timeout": 10,
+        "retries": 1,
+        "fragment_retries": 2,
+        "no_check_certificate": True,
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -408,19 +408,9 @@ async def get_audio_stream_url(video_id: str) -> str:
     
     option_sets = []
     
-    # If cookie file exists, use it with multiple player clients
+    # If cookie file exists, use it with prioritized player clients
     if has_cookie_file:
         option_sets.extend([
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "web", "ios", "mweb"],
-                        "po_token_ver": "2",
-                    }
-                },
-                "cookiefile": cookie_file,
-            },
             {
                 **base_opts,
                 "extractor_args": {

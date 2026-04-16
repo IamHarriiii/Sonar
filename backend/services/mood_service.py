@@ -11,7 +11,11 @@ This is the high-level service called by routes. It delegates to:
 import logging
 
 from services.llm_service import analyze_emotion
-from services.ytmusic_service import get_recommendations, get_audio_stream_url, prefetch_playlist_streams
+from services.ytmusic_service import (
+    get_recommendations,
+    get_audio_stream_url,
+    prefetch_playlist_streams,
+)
 from services.transcription_service import transcribe_audio
 from services.weather_service import get_weather
 

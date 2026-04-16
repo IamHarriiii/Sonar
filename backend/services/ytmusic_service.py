@@ -359,7 +359,6 @@ async def get_recommendations(
     return all_tracks
 
 
-
 # Simple in-memory cache: {video_id: (url, expires_at)}
 _stream_cache: Dict[str, Tuple[str, float]] = {}
 CACHE_TTL = 60 * 60 * 5  # 5 hours (URLs expire in ~6h)
@@ -368,7 +367,7 @@ CACHE_TTL = 60 * 60 * 5  # 5 hours (URLs expire in ~6h)
 async def get_audio_stream_url_cached(video_id: str) -> str:
     """Get audio stream URL with caching to avoid repeated extractions."""
     now = time.time()
-    
+
     # Check cache first
     if video_id in _stream_cache:
         url, expires = _stream_cache[video_id]
@@ -378,16 +377,16 @@ async def get_audio_stream_url_cached(video_id: str) -> str:
         else:
             # Expired, remove from cache
             del _stream_cache[video_id]
-    
+
     # Extract with hard timeout
     try:
         url = await asyncio.wait_for(
             get_audio_stream_url(video_id),
-            timeout=25.0  # fail fast before CloudFront kills it
+            timeout=25.0,  # fail fast before CloudFront kills it
         )
     except asyncio.TimeoutError:
         raise ValueError("Audio extraction timed out. Please try again.")
-    
+
     # Cache the result
     _stream_cache[video_id] = (url, now + CACHE_TTL)
     logger.info(f"Cached stream URL for {video_id}")
@@ -413,9 +412,11 @@ async def get_audio_stream_url(video_id: str) -> str:
     cmd = [
         "yt-dlp",
         "--get-url",
-        "-f", "bestaudio[ext=m4a]/bestaudio/best",
+        "-f",
+        "bestaudio[ext=m4a]/bestaudio/best",
         "--no-playlist",
-        "--socket-timeout", "10",
+        "--socket-timeout",
+        "10",
     ]
 
     if has_cookies:
@@ -466,6 +467,7 @@ async def get_audio_stream_url(video_id: str) -> str:
 
 async def prefetch_playlist_streams(tracks: list[dict]):
     """Fire-and-forget background task to pre-warm stream URLs."""
+
     async def _fetch(video_id: str):
         try:
             await get_audio_stream_url_cached(video_id)
@@ -476,5 +478,7 @@ async def prefetch_playlist_streams(tracks: list[dict]):
 
     # Fire and forget - don't await
     asyncio.create_task(
-        asyncio.gather(*[_fetch(t.get("video_id", "")) for t in tracks if t.get("video_id")])
+        asyncio.gather(
+            *[_fetch(t.get("video_id", "")) for t in tracks if t.get("video_id")]
+        )
     )

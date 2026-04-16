@@ -365,7 +365,52 @@ async def get_audio_stream_url(video_id: str) -> str:
     URLs are temporary (~6 hours) and should be fetched on-demand.
     """
     import yt_dlp
+import time
+from typing import Dict, Tuple
 
+# Simple in-memory cache: {video_id: (url, expires_at)}
+_stream_cache: Dict[str, Tuple[str, float]] = {}
+CACHE_TTL = 60 * 60 * 5  # 5 hours (URLs expire in ~6h)
+
+
+async def get_audio_stream_url_cached(video_id: str) -> str:
+    """Get audio stream URL with caching to avoid repeated extractions."""
+    now = time.time()
+    
+    # Check cache first
+    if video_id in _stream_cache:
+        url, expires = _stream_cache[video_id]
+        if now < expires:
+            logger.info(f"Using cached stream URL for {video_id}")
+            return url  # instant return
+        else:
+            # Expired, remove from cache
+            del _stream_cache[video_id]
+    
+    # Extract with hard timeout
+    try:
+        url = await asyncio.wait_for(
+            get_audio_stream_url(video_id),
+            timeout=25.0  # fail fast before CloudFront kills it
+        )
+    except asyncio.TimeoutError:
+        raise ValueError("Audio extraction timed out. Please try again.")
+    
+    # Cache the result
+    _stream_cache[video_id] = (url, now + CACHE_TTL)
+    logger.info(f"Cached stream URL for {video_id}")
+    return url
+
+
+async def get_audio_stream_url(video_id: str) -> str:
+    """
+    Extract the best audio stream URL for a YouTube video using yt-dlp.
+
+    Returns a direct audio URL that can be played with new Audio().
+    URLs are temporary (~6 hours) and should be fetched on-demand.
+    """
+    import asyncio
+    
     url_candidates = [
         f"https://www.youtube.com/watch?v={video_id}",
         f"https://music.youtube.com/watch?v={video_id}",
@@ -579,3 +624,19 @@ async def get_audio_stream_url(video_id: str) -> str:
 
     logger.info(f"yt-dlp: extracted audio stream for {video_id}")
     return audio_url
+
+
+async def prefetch_playlist_streams(tracks: list[dict]):
+    """Fire-and-forget background task to pre-warm stream URLs."""
+    async def _fetch(video_id: str):
+        try:
+            await get_audio_stream_url_cached(video_id)
+            logger.info(f"Prefetched stream URL for {video_id}")
+        except Exception as e:
+            logger.warning(f"Failed to prefetch {video_id}: {str(e)[:100]}")
+            pass  # silently fail, will retry on demand
+
+    # Fire and forget - don't await
+    asyncio.create_task(
+        asyncio.gather(*[_fetch(t.get("video_id", "")) for t in tracks if t.get("video_id")])
+    )

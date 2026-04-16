@@ -32,9 +32,9 @@ from services.mood_service import (
     analyze_mood,
     fetch_weather,
     generate_playlist,
-    stream_audio,
     transcribe,
 )
+from services.ytmusic_service import get_audio_stream_url_cached, prefetch_playlist_streams
 
 router = APIRouter(prefix="/mood", tags=["mood"])
 
@@ -323,14 +323,13 @@ async def get_stream(
     current_user: User = Depends(get_current_user),
 ):
     """Extract audio stream URL for a YouTube Music track (on-demand)."""
-    import asyncio
     try:
-        # Add timeout to prevent 504 errors
-        audio_url = await asyncio.wait_for(stream_audio(video_id), timeout=10.0)
+        # Use cached function with built-in timeout
+        audio_url = await get_audio_stream_url_cached(video_id)
         return {"audio_url": audio_url}
-    except asyncio.TimeoutError:
+    except ValueError as e:
         from fastapi import HTTPException
-        raise HTTPException(status_code=504, detail="Audio extraction timed out. Please try again.")
+        raise HTTPException(status_code=504, detail=str(e))
     except Exception as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=502, detail=f"Could not extract audio: {e}")

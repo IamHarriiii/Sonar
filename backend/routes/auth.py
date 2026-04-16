@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import base64
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from schemas import (
@@ -252,11 +251,12 @@ async def delete_account(
 ) -> MessageResponse:
     """Permanently delete user account and all associated data."""
     username = current_user.username
-    logger.info(f"Account deletion requested for user: {username} (id: {current_user.id})")
+    logger.info(
+        f"Account deletion requested for user: {username} (id: {current_user.id})"
+    )
 
     await db.delete(current_user)
     await db.commit()
 
     logger.info(f"Account deleted: {username}")
     return MessageResponse(message="Account permanently deleted")
-

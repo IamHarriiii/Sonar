@@ -139,6 +139,20 @@ export const authApi = {
     api.post("/auth/logout", { refresh_token }),
 
   me: () => api.get("/auth/me"),
+
+  updateProfile: (payload) =>
+    api.put("/auth/profile", payload),
+
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return rawRequest("/auth/avatar", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteAccount: () => api.delete("/auth/account"),
 };
 
 // Mood analysis API calls

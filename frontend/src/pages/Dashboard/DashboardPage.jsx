@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import StarfieldCanvas from "../../components/StarfieldCanvas";
 import useAuthStore from "../../stores/useAuthStore";
 import usePlaylistStore from "../../stores/usePlaylistStore";
+import { authApi, moodApi } from "../../services/api";
 import "./DashboardPage.css";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const { playlists, deletePlaylist, fetchPlaylists } = usePlaylistStore();
   const displayName = user?.username || "User";
   const displayInitial = displayName.charAt(0).toUpperCase();
@@ -15,6 +16,19 @@ export default function DashboardPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("account");
   const profileRef = useRef(null);
+  const avatarInputRef = useRef(null);
+  const [profileForm, setProfileForm] = useState({
+    username: user?.username || "",
+    email: user?.email || "",
+  });
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [smartNotifications, setSmartNotifications] = useState([]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -30,6 +44,13 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchPlaylists();
   }, [fetchPlaylists]);
+
+  useEffect(() => {
+    setProfileForm({
+      username: user?.username || "",
+      email: user?.email || "",
+    });
+  }, [user?.username, user?.email]);
 
   // Time-based greeting
   const hour = new Date().getHours();
@@ -54,6 +75,152 @@ export default function DashboardPage() {
   const handleDelete = (e, id) => {
     e.stopPropagation();
     deletePlaylist(id);
+  };
+
+  const usernameCooldownDaysRemaining = useMemo(() => {
+    if (!user?.username_changed_at) return 0;
+    const changedAt = new Date(user.username_changed_at);
+    if (Number.isNaN(changedAt.getTime())) return 0;
+    const daysElapsed = Math.floor(
+      (Date.now() - changedAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return Math.max(0, 30 - daysElapsed);
+  }, [user?.username_changed_at]);
+
+  const dismissNotification = (id) => {
+    const dismissed = JSON.parse(
+      localStorage.getItem("sonar-dismissed-notifications") || "[]"
+    );
+    if (!dismissed.includes(id)) {
+      localStorage.setItem(
+        "sonar-dismissed-notifications",
+        JSON.stringify([...dismissed, id])
+      );
+    }
+    setSmartNotifications((prev) => prev.filter((notification) => notification.id !== id));
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const buildNotifications = async () => {
+      const dismissed = new Set(
+        JSON.parse(localStorage.getItem("sonar-dismissed-notifications") || "[]")
+      );
+      const nextNotifications = [];
+
+      const lastVisit = localStorage.getItem("sonar-last-visit");
+      if (lastVisit) {
+        const diffDays = Math.floor(
+          (Date.now() - new Date(lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (diffDays >= 3 && !dismissed.has("welcome-back")) {
+          nextNotifications.push({
+            id: "welcome-back",
+            icon: "👋",
+            message: `Hey, we missed you! It's been ${diffDays} days - how's life?`,
+          });
+        }
+      }
+      localStorage.setItem("sonar-last-visit", new Date().toISOString());
+
+      try {
+        const history = await moodApi.history(60, 10);
+        const entries = Array.isArray(history?.entries) ? history.entries : [];
+        if (entries.length >= 3) {
+          const [first, second, third] = entries;
+          const emotion = first?.base_emotion;
+          if (
+            emotion &&
+            emotion === second?.base_emotion &&
+            emotion === third?.base_emotion &&
+            !dismissed.has("mood-pattern")
+          ) {
+            nextNotifications.push({
+              id: "mood-pattern",
+              icon: "🎭",
+              message: `You've been feeling ${emotion} lately - want to explore new vibes?`,
+            });
+          }
+        }
+      } catch {
+        // Non-blocking enhancement: ignore fetch failures here.
+      }
+
+      if (isMounted) {
+        setSmartNotifications(nextNotifications);
+      }
+    };
+
+    buildNotifications();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSaveProfile = async () => {
+    const username = profileForm.username.trim();
+    const email = profileForm.email.trim();
+
+    setProfileError("");
+    setProfileSuccess("");
+
+    if (!username) {
+      setProfileError("Username cannot be empty.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const updated = await authApi.updateProfile({
+        username,
+        email: email || null,
+      });
+      setUser(updated);
+      setProfileSuccess("Profile updated successfully.");
+    } catch (err) {
+      setProfileError(err.message || "Failed to update profile.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setProfileError("");
+    setProfileSuccess("");
+    setIsUploadingAvatar(true);
+
+    try {
+      const updated = await authApi.uploadAvatar(file);
+      setUser(updated);
+      setProfileSuccess("Avatar updated.");
+    } catch (err) {
+      setProfileError(err.message || "Failed to upload avatar.");
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmInput !== (user?.username || "")) {
+      setProfileError("Username confirmation does not match.");
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setProfileError("");
+    try {
+      await authApi.deleteAccount();
+      await logout();
+      navigate("/");
+    } catch (err) {
+      setProfileError(err.message || "Failed to delete account.");
+      setIsDeletingAccount(false);
+    }
   };
 
   // ── Settings state (persisted to localStorage) ──
@@ -152,7 +319,11 @@ export default function DashboardPage() {
               aria-label="User profile menu"
             >
               <div className="db-avatar">
-                <span>{displayInitial}</span>
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={`${displayName} avatar`} className="db-avatar-image" />
+                ) : (
+                  <span>{displayInitial}</span>
+                )}
                 <div className="db-avatar-ring" />
               </div>
               <span className="db-username">{displayName}</span>
@@ -170,10 +341,16 @@ export default function DashboardPage() {
             {profileOpen && (
               <div className="db-dropdown">
                 <div className="db-dropdown-header">
-                  <div className="db-dropdown-avatar">{displayInitial}</div>
+                  <div className="db-dropdown-avatar">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt={`${displayName} avatar`} className="db-avatar-image" />
+                    ) : (
+                      displayInitial
+                    )}
+                  </div>
                   <div>
                     <p className="db-dropdown-name">{displayName}</p>
-                    <p className="db-dropdown-email">@{displayName}</p>
+                    <p className="db-dropdown-email">{user?.email || `@${displayName}`}</p>
                   </div>
                 </div>
                 <div className="db-dropdown-divider" />
@@ -201,6 +378,26 @@ export default function DashboardPage() {
 
       {/* ── Main Content ── */}
       <main className="db-main">
+        {smartNotifications.length > 0 && (
+          <section className="db-smart-notifications">
+            {smartNotifications.map((notification) => (
+              <div key={notification.id} className="db-smart-banner">
+                <div className="db-smart-banner-content">
+                  <span className="db-smart-banner-icon">{notification.icon}</span>
+                  <p>{notification.message}</p>
+                </div>
+                <button
+                  className="db-smart-banner-close"
+                  onClick={() => dismissNotification(notification.id)}
+                  aria-label="Dismiss notification"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* Hero greeting */}
         <section className="db-hero">
           <div className="db-hero-text">
@@ -404,24 +601,68 @@ export default function DashboardPage() {
                   <div className="db-settings-section">
                     <h3>Account Details</h3>
                     <div className="db-settings-row">
-                      <div className="db-settings-avatar-big">{displayInitial}</div>
+                      <div className="db-settings-avatar-big">
+                        {user?.avatar_url ? (
+                          <img src={user.avatar_url} alt={`${displayName} avatar`} className="db-avatar-image" />
+                        ) : (
+                          displayInitial
+                        )}
+                      </div>
                       <div>
                         <p className="db-settings-name">{displayName}</p>
-                        <button className="db-settings-change-avatar">Change avatar</button>
+                        <button
+                          className="db-settings-change-avatar"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                        >
+                          {isUploadingAvatar ? "Uploading..." : "Change avatar"}
+                        </button>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="db-hidden-file-input"
+                          onChange={handleAvatarUpload}
+                        />
                       </div>
                     </div>
                     <div className="db-settings-field">
                       <label>Username</label>
-                      <input type="text" defaultValue={displayName} />
+                      <input
+                        type="text"
+                        value={profileForm.username}
+                        onChange={(e) =>
+                          setProfileForm((prev) => ({ ...prev, username: e.target.value }))
+                        }
+                      />
+                      {usernameCooldownDaysRemaining > 0 &&
+                        profileForm.username.trim() !== (user?.username || "") && (
+                          <p className="db-settings-inline-hint">
+                            You can change your username again in {usernameCooldownDaysRemaining} day(s).
+                          </p>
+                        )}
                     </div>
                     <div className="db-settings-field">
                       <label>Email</label>
-                      <input type="email" placeholder="No email set" />
+                      <input
+                        type="email"
+                        placeholder="No email set"
+                        value={profileForm.email}
+                        onChange={(e) =>
+                          setProfileForm((prev) => ({ ...prev, email: e.target.value }))
+                        }
+                      />
                     </div>
-                    <button className="db-settings-save">Save Changes</button>
+                    {profileError && <p className="db-settings-error">{profileError}</p>}
+                    {profileSuccess && <p className="db-settings-success">{profileSuccess}</p>}
+                    <button className="db-settings-save" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                      {isSavingProfile ? "Saving..." : "Save Changes"}
+                    </button>
                     <div className="db-settings-danger-zone">
                       <h4>Danger Zone</h4>
-                      <button className="db-settings-delete">Delete Account</button>
+                      <button className="db-settings-delete" onClick={() => setShowDeleteConfirm(true)}>
+                        Delete Account
+                      </button>
                     </div>
                   </div>
                 )}
@@ -557,6 +798,55 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="db-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="db-modal db-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-header">
+              <h2 className="db-modal-title">Delete Account</h2>
+              <button
+                className="db-modal-close"
+                onClick={() => setShowDeleteConfirm(false)}
+                aria-label="Close delete account"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="db-modal-content">
+              <div className="db-settings-section">
+                <p className="db-settings-desc">
+                  This action is permanent. Type <strong>{user?.username}</strong> to confirm account deletion.
+                </p>
+                <div className="db-settings-field">
+                  <label>Confirm username</label>
+                  <input
+                    type="text"
+                    value={deleteConfirmInput}
+                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                  />
+                </div>
+                {profileError && <p className="db-settings-error">{profileError}</p>}
+                <div className="db-confirm-actions">
+                  <button
+                    className="db-settings-action-btn"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeletingAccount}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="db-settings-action-btn db-settings-action-btn--danger"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount || deleteConfirmInput !== (user?.username || "")}
+                  >
+                    {isDeletingAccount ? "Deleting..." : "Delete permanently"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -396,226 +396,66 @@ async def get_audio_stream_url_cached(video_id: str) -> str:
 
 async def get_audio_stream_url(video_id: str) -> str:
     """
-    Extract the best audio stream URL for a YouTube video using yt-dlp.
+    Extract the best audio stream URL for a YouTube video using yt-dlp CLI.
 
-    Returns a direct audio URL that can be played with new Audio().
-    URLs are temporary (~6 hours) and should be fetched on-demand.
+    Uses subprocess so yt-dlp reads system config (/etc/yt-dlp.conf)
+    which includes --remote-components ejs:github for signature solving.
     """
     import asyncio
-    import yt_dlp
-    
-    url_candidates = [
-        f"https://www.youtube.com/watch?v={video_id}",
-        f"https://music.youtube.com/watch?v={video_id}",
+    import subprocess
+    import os
+
+    cookie_file = os.environ.get("YT_COOKIE_FILE", "/opt/sonar/backend/cookies.txt")
+    has_cookies = os.path.exists(cookie_file)
+
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
+    cmd = [
+        "yt-dlp",
+        "--get-url",
+        "-f", "bestaudio[ext=m4a]/bestaudio/best",
+        "--no-playlist",
+        "--socket-timeout", "10",
     ]
 
-    base_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
-        "skip_download": True,
-        "noplaylist": True,
-        "socket_timeout": 10,
-        "retries": 1,
-        "fragment_retries": 2,
-        "no_check_certificate": True,
-        "http_headers": {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-        },
-    }
+    if has_cookies:
+        cmd.extend(["--cookies", cookie_file])
+        logger.info(f"Using cookie file: {cookie_file}")
 
-    import os
-    
-    # Check if cookie file exists for deployed server
-    cookie_file = os.environ.get("YT_COOKIE_FILE", "/opt/sonar/backend/cookies.txt")
-    has_cookie_file = os.path.exists(cookie_file)
-    
-    if has_cookie_file:
-        logger.info(f"Using manual cookie file: {cookie_file}")
-    
-    option_sets = []
-    
-    # If cookie file exists, use it with prioritized player clients
-    if has_cookie_file:
-        option_sets.extend([
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["web"],
-                        "po_token_ver": "2",
-                    }
-                },
-                "cookiefile": cookie_file,
-            },
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android"],
-                        "po_token_ver": "2",
-                    }
-                },
-                "cookiefile": cookie_file,
-            },
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["music"],
-                    }
-                },
-                "cookiefile": cookie_file,
-            },
-        ])
-    else:
-        # Fallback to browser cookies (only works locally)
-        logger.warning("No cookie file found, falling back to browser cookies (may not work on deployed server)")
-        option_sets.extend([
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "web", "ios", "mweb"],
-                        "po_token_ver": "2",
-                    }
-                },
-                "cookiesfrombrowser": ("chrome",),
-            },
-            {
-                **base_opts,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "web", "ios", "mweb"],
-                        "po_token_ver": "2",
-                    }
-                },
-                "cookiesfrombrowser": ("firefox",),
-            },
-        ])
-    
-    # OAuth2 is causing 400 errors, skip for now
-    # TODO: Fix OAuth2 token refresh issue later
-    
-    # Add simple working option set as primary
-    option_sets.insert(0, {
-        **base_opts,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web"],
-            }
-        },
-    })
-    
-    # Always add no-cookie fallbacks
-    option_sets.extend([
-        # Android only without cookies
-        {
-            **base_opts,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android"],
-                }
-            },
-        },
-        # TV client fallback (often less restricted)
-        {
-            **base_opts,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv"],
-                }
-            },
-        },
-    ])
+    cmd.append(url)
 
-    def _extract_single(url: str, opts: dict) -> str:
-        """Single extraction attempt (thread-safe, no signals)."""
+    def _run_cli() -> str:
+        """Run yt-dlp CLI and return the audio URL."""
+        env = os.environ.copy()
+        env["PATH"] = f"/usr/local/bin:/usr/bin:/bin:{env.get('PATH', '')}"
+
         try:
-            logger.info(f"Attempting extraction for {video_id} with client: {opts.get('extractor_args', {}).get('youtube', {}).get('player_client', ['default'])}")
-            
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                audio_url = info.get("url", "")
-                if audio_url:
-                    logger.info(f"Successfully extracted {video_id}")
-                    return audio_url
-                else:
-                    logger.warning(f"No audio URL found for {video_id}")
-                    return ""
+            logger.info(f"Extracting stream for {video_id} via CLI")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                env=env,
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+                audio_url = result.stdout.strip().split("\n")[0]
+                logger.info(f"Successfully extracted {video_id}")
+                return audio_url
+            else:
+                stderr = result.stderr.strip()[-200:] if result.stderr else "No stderr"
+                logger.error(f"yt-dlp CLI failed for {video_id}: {stderr}")
+                return ""
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"yt-dlp CLI timeout for {video_id}")
+            return ""
         except Exception as err:
-            logger.error(f"yt-dlp extraction failed for {video_id}: {str(err)}")
+            logger.error(f"yt-dlp CLI error for {video_id}: {str(err)}")
             return ""
 
-    def _extract() -> str:
-        last_error = None
-        
-        # Try primary methods first (most likely to succeed)
-        if has_cookie_file and option_sets:
-            for opts in option_sets[:2]:  # Try first 2 cookie-based options
-                for url in url_candidates[:1]:  # Try only main YouTube URL
-                    result = _extract_single(url, opts)
-                    if result:
-                        return result
-        
-        # Fallback to no-cookie methods
-        no_cookie_opts = [opts for opts in option_sets if "cookiefile" not in opts]
-        if no_cookie_opts:
-            for opts in no_cookie_opts[:2]:  # Try first 2 no-cookie options
-                for url in url_candidates[:1]:
-                    result = _extract_single(url, opts)
-                    if result:
-                        return result
-
-        # Quick fallback attempts (single attempt each)
-        fallback_attempts = [
-            # Minimal web client
-            {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "socket_timeout": 5,
-                "extractor_args": {"youtube": {"player_client": ["web"]}},
-            },
-            # Android mobile
-            {
-                "format": "bestaudio/best",
-                "quiet": True,
-                "no_warnings": True,
-                "skip_download": True,
-                "noplaylist": True,
-                "socket_timeout": 5,
-                "extractor_args": {"youtube": {"player_client": ["android"]}},
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36",
-                },
-            },
-        ]
-        
-        for fallback_opts in fallback_attempts:
-            result = _extract_single(url_candidates[0], fallback_opts)
-            if result:
-                return result
-        
-        # If all attempts failed, raise the last error with details
-        error_msg = f"All extraction attempts failed for {video_id}. Last error: {last_error}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
-
-    audio_url = await asyncio.to_thread(_extract)
+    audio_url = await asyncio.to_thread(_run_cli)
 
     if not audio_url:
         raise ValueError(f"Could not extract audio URL for {video_id}")

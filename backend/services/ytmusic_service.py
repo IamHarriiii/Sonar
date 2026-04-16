@@ -429,6 +429,16 @@ async def get_audio_stream_url(video_id: str) -> str:
             },
             "cookiesfrombrowser": ("safari",),
         },
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web", "ios", "mweb"],
+                    "po_token_ver": "2",
+                }
+            },
+            "cookiesfrombrowser": ("edge",),
+        },
         # Try with different player clients
         {
             **base_opts,
@@ -460,6 +470,16 @@ async def get_audio_stream_url(video_id: str) -> str:
             },
             "cookiesfrombrowser": ("chrome",),
         },
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mweb"],
+                    "po_token_ver": "2",
+                }
+            },
+            "cookiesfrombrowser": ("chrome",),
+        },
         # Try without PO tokens
         {
             **base_opts,
@@ -470,12 +490,30 @@ async def get_audio_stream_url(video_id: str) -> str:
             },
             "cookiesfrombrowser": ("chrome",),
         },
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web", "ios", "mweb"],
+                }
+            },
+            "cookiesfrombrowser": ("firefox",),
+        },
         # Android only without cookies
         {
             **base_opts,
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android"],
+                }
+            },
+        },
+        # TV client fallback (often less restricted)
+        {
+            **base_opts,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv"],
                 }
             },
         },
@@ -570,6 +608,61 @@ async def get_audio_stream_url(video_id: str) -> str:
         except Exception as mweb_err:
             logger.error(f"yt-dlp mweb fallback failed for {video_id}: {str(mweb_err)[:100]}")
             last_error = mweb_err
+        
+        # TV client fallback (often less restricted)
+        try:
+            tv_opts = {
+                "format": "bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["tv"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.122 Safari/537.36 WebAppManager",
+                },
+            }
+            with yt_dlp.YoutubeDL(tv_opts) as ydl:
+                info = ydl.extract_info(url_candidates[0], download=False)
+                audio_url = info.get("url", "")
+                if audio_url:
+                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using TV fallback")
+                    return audio_url
+        except Exception as tv_err:
+            logger.error(f"yt-dlp TV fallback failed for {video_id}: {str(tv_err)[:100]}")
+            last_error = tv_err
+        
+        # Music app client fallback
+        try:
+            music_opts = {
+                "format": "bestaudio/best",
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["music"],
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/89.0.4389.105 Mobile Safari/537.36",
+                    "Referer": "https://music.youtube.com/",
+                },
+            }
+            with yt_dlp.YoutubeDL(music_opts) as ydl:
+                info = ydl.extract_info(url_candidates[0], download=False)
+                audio_url = info.get("url", "")
+                if audio_url:
+                    logger.info(f"yt-dlp: extracted audio stream for {video_id} using music app fallback")
+                    return audio_url
+        except Exception as music_err:
+            logger.error(f"yt-dlp music app fallback failed for {video_id}: {str(music_err)[:100]}")
+            last_error = music_err
 
         if last_error:
             raise last_error

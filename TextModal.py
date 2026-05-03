@@ -1,23 +1,26 @@
 """
-SONAR – Text Emotion & Sentiment Pipeline
+Text Emotion & Sentiment Pipeline
 
 End-to-end script that:
 
 1. Trains three transformer models on:
-   - Coarse emotions   (4 classes: happy, sad, angry, neutral)  → EmoRoBERTa-X on GoEmotions
-   - Fine-grained emotions (27 classes)                          → EmoRoBERTa-X on GoEmotions
-   - Sentiment polarity (3 classes: positive, neutral, negative) → DeBERTaV3 on Sentiment140
+   - Basic emotions    (5 classes: anger, fear, joy, sadness, surprise)
+                       → EmoRoBERTa-X on Twitter Emotion dataset
+   - Advanced emotions (28 classes: full GoEmotions label space)
+                       → EmoRoBERTa-X on GoEmotions
+   - Sentiment polarity (3 classes: negative, neutral, positive)
+                       → DeBERTa on TweetEval sentiment
 
 2. Saves best models to:
-   - ./models/coarse_emotion_best
-   - ./models/fine_emotion_best
+   - ./models/basic_emotion_best
+   - ./models/advanced_emotion_best
    - ./models/sentiment_best
 
 3. Provides explainable inference with attention visualization and an
    ensemble analyzer combining all three models.
 
 Optimized for ~4GB GPU using:
-   - EmoRoBERTa-X / DeBERTaV3 with only the final transformer layer unfrozen
+   - EmoRoBERTa-X / DeBERTa with only the final transformer layer unfrozen
    - max_seq_length = 256
    - per_device_batch_size = 4
    - gradient_accumulation_steps = 4 (effective batch = 16)
@@ -57,44 +60,43 @@ from transformers import (
 
 # ==================== GLOBAL CONFIG ====================
 
-COARSE_MODEL_CHECKPOINT  = "arpanghoshal/EmoRoBERTa"   # EmoRoBERTa-X base
-FINE_MODEL_CHECKPOINT    = "arpanghoshal/EmoRoBERTa"
-SENTIMENT_MODEL_CHECKPOINT = "microsoft/deberta-v3-base"
+EMORO_CHECKPOINT     = "arpanghoshal/EmoRoBERTa"    # EmoRoBERTa-X for basic + advanced
+SENTIMENT_CHECKPOINT = "microsoft/deberta-v3-base"  # DeBERTa for sentiment
 
-BATCH_SIZE        = 4
-GRAD_ACCUM_STEPS  = 4
-NUM_EPOCHS        = 5
-MAX_SEQ_LENGTH    = 256
-LEARNING_RATE     = 2e-5
+BATCH_SIZE       = 4
+GRAD_ACCUM_STEPS = 4
+NUM_EPOCHS       = 5
+MAX_SEQ_LENGTH   = 256
+LEARNING_RATE    = 2e-5
 
 device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USE_FP16 = bool(torch.cuda.is_available())
 
-print(f"Using device: {device}")
-print(f"Coarse/Fine model : {COARSE_MODEL_CHECKPOINT}")
-print(f"Sentiment model   : {SENTIMENT_MODEL_CHECKPOINT}")
+print(f"Using device      : {device}")
+print(f"Basic/Adv model   : {EMORO_CHECKPOINT}")
+print(f"Sentiment model   : {SENTIMENT_CHECKPOINT}")
 print(f"Batch size: {BATCH_SIZE}, GradAccum: {GRAD_ACCUM_STEPS}, MaxLen: {MAX_SEQ_LENGTH}, fp16: {USE_FP16}")
 
 
 # ==================== EMOTION LABEL SPACES ====================
 
-COARSE_EMOTIONS = ["happy", "sad", "angry", "neutral"]
+BASIC_EMOTIONS = ["anger", "fear", "joy", "sadness", "surprise"]
 
-FINE_EMOTIONS = [
+ADVANCED_EMOTIONS = [
     "admiration", "amusement", "anger", "annoyance", "approval", "caring",
     "confusion", "curiosity", "desire", "disappointment", "disapproval",
     "disgust", "embarrassment", "excitement", "fear", "gratitude", "grief",
-    "joy", "love", "nervousness", "optimism", "pride", "realization",
-    "relief", "remorse", "sadness", "surprise",
+    "joy", "love", "nervousness", "neutral", "optimism", "pride",
+    "realization", "relief", "remorse", "sadness", "surprise",
 ]
 
 SENTIMENT_LABELS = ["negative", "neutral", "positive"]
 
-COARSE_LABEL2ID = {e: i for i, e in enumerate(COARSE_EMOTIONS)}
-COARSE_ID2LABEL = {i: e for i, e in enumerate(COARSE_EMOTIONS)}
+BASIC_LABEL2ID    = {e: i for i, e in enumerate(BASIC_EMOTIONS)}
+BASIC_ID2LABEL    = {i: e for i, e in enumerate(BASIC_EMOTIONS)}
 
-FINE_LABEL2ID   = {e: i for i, e in enumerate(FINE_EMOTIONS)}
-FINE_ID2LABEL   = {i: e for i, e in enumerate(FINE_EMOTIONS)}
+ADVANCED_LABEL2ID = {e: i for i, e in enumerate(ADVANCED_EMOTIONS)}
+ADVANCED_ID2LABEL = {i: e for i, e in enumerate(ADVANCED_EMOTIONS)}
 
 SENTIMENT_LABEL2ID = {e: i for i, e in enumerate(SENTIMENT_LABELS)}
 SENTIMENT_ID2LABEL = {i: e for i, e in enumerate(SENTIMENT_LABELS)}
@@ -112,8 +114,8 @@ class TextEmotionResult:
     attention_weights: np.ndarray
     sentiment_indicators: Dict[str, Any]
     model_name: str
-    coarse_emotion: Optional[str] = None
-    fine_emotion: Optional[str] = None
+    basic_emotion: Optional[str] = None
+    advanced_emotion: Optional[str] = None
     sentiment: Optional[str] = None
 
 
@@ -133,7 +135,7 @@ class SentimentIndicators:
 
 class EnhancedTextEmotionModel:
 
-    def __init__(self, model_path: str, model_name: str = "coarse"):
+    def __init__(self, model_path: str, model_name: str = "basic"):
         print(f"\n[EnhancedTextEmotionModel] Loading '{model_name}' model from {model_path}...")
 
         self.model_name = model_name
@@ -143,12 +145,12 @@ class EnhancedTextEmotionModel:
         self.model.to(self.device)
         self.model.eval()
 
-        self.id2label   = self.model.config.id2label
-        self.label2id   = self.model.config.label2id
+        self.id2label = self.model.config.id2label
+        self.label2id = self.model.config.label2id
 
         self._initialize_sentiment_lexicons()
 
-        print(f"✅ Model loaded: {len(self.id2label)} classes")
+        print(f"Model loaded: {len(self.id2label)} classes")
         print(f"   Labels: {list(self.id2label.values())}")
 
     def _initialize_sentiment_lexicons(self):
@@ -205,13 +207,13 @@ class EnhancedTextEmotionModel:
             for i in range(len(probabilities))
         }
 
-        attentions        = outputs.attentions
-        last_layer_attn   = attentions[-1]
-        avg_attention     = last_layer_attn.mean(dim=1)[0]
-        cls_attention     = avg_attention[0].detach().cpu().numpy()
+        attentions      = outputs.attentions
+        last_layer_attn = attentions[-1]
+        avg_attention   = last_layer_attn.mean(dim=1)[0]
+        cls_attention   = avg_attention[0].detach().cpu().numpy()
 
-        tokens               = self.tokenizer.convert_ids_to_tokens(input_ids[0])
-        special_tokens_mask  = inputs["special_tokens_mask"][0].detach().cpu().numpy()
+        tokens              = self.tokenizer.convert_ids_to_tokens(input_ids[0])
+        special_tokens_mask = inputs["special_tokens_mask"][0].detach().cpu().numpy()
 
         important_tokens     = self._calculate_token_importance(tokens, cls_attention, special_tokens_mask)
         sentiment_indicators = self._extract_sentiment_indicators(text)
@@ -246,8 +248,8 @@ class EnhancedTextEmotionModel:
         text_lower = text.lower()
         words      = re.findall(r"\b\w+\b", text_lower)
 
-        positive_found = [w for w in words if w in self.positive_words]
-        negative_found = [w for w in words if w in self.negative_words]
+        positive_found     = [w for w in words if w in self.positive_words]
+        negative_found     = [w for w in words if w in self.negative_words]
         intensifiers_found = [w for w in words if w in self.intensifiers]
         negations_found    = [w for w in words if w in self.negations]
 
@@ -296,37 +298,37 @@ class EnhancedTextEmotionModel:
     def explain_prediction(self, result: TextEmotionResult) -> str:
         parts: List[str] = []
 
-        parts.append(f"📊 Emotion Analysis: {result.predicted_emotion.upper()}")
+        parts.append(f"Emotion Analysis: {result.predicted_emotion.upper()}")
         parts.append(f"   Confidence: {result.confidence:.1%}\n")
 
-        parts.append("🔑 Most Important Words:")
+        parts.append("Most Important Words:")
         for i, (token, score) in enumerate(result.important_tokens[:5], 1):
             parts.append(f"   {i}. '{token}' (importance: {score:.3f})")
         parts.append("")
 
         ind = result.sentiment_indicators
-        parts.append("💡 Linguistic Indicators:")
+        parts.append("Linguistic Indicators:")
         if ind["positive_words"]:
-            parts.append(f"   ✓ Positive words: {', '.join(ind['positive_words'][:5])}")
+            parts.append(f"   Positive words: {', '.join(ind['positive_words'][:5])}")
         if ind["negative_words"]:
-            parts.append(f"   ✓ Negative words: {', '.join(ind['negative_words'][:5])}")
+            parts.append(f"   Negative words: {', '.join(ind['negative_words'][:5])}")
         if ind["intensifiers"]:
-            parts.append(f"   ✓ Intensifiers: {', '.join(ind['intensifiers'][:3])}")
+            parts.append(f"   Intensifiers: {', '.join(ind['intensifiers'][:3])}")
         if ind["negations"]:
-            parts.append(f"   ⚠ Negations detected: {', '.join(ind['negations'])}")
+            parts.append(f"   Negations detected: {', '.join(ind['negations'])}")
         if ind["emotional_phrases"]:
-            parts.append(f"   ✓ Emotional phrases: {', '.join(ind['emotional_phrases'][:3])}")
+            parts.append(f"   Emotional phrases: {', '.join(ind['emotional_phrases'][:3])}")
 
-        parts.append("\n📝 Text Characteristics:")
-        parts.append(f"   • Length: {ind['text_length']} words")
-        parts.append(f"   • Exclamations: {ind['exclamation_count']}")
-        parts.append(f"   • Questions: {ind['question_count']}")
+        parts.append("\nText Characteristics:")
+        parts.append(f"   Length: {ind['text_length']} words")
+        parts.append(f"   Exclamations: {ind['exclamation_count']}")
+        parts.append(f"   Questions: {ind['question_count']}")
 
-        parts.append("\n🔄 Alternative Interpretations:")
+        parts.append("\nAlternative Interpretations:")
         sorted_probs = sorted(result.all_probabilities.items(), key=lambda x: x[1], reverse=True)
         for emotion, prob in sorted_probs[1:4]:
             if prob > 0.1:
-                parts.append(f"   • {emotion}: {prob:.1%}")
+                parts.append(f"   {emotion}: {prob:.1%}")
 
         return "\n".join(parts)
 
@@ -335,44 +337,44 @@ class EnhancedTextEmotionModel:
 
 class EnsembleTextEmotionAnalyzer:
 
-    def __init__(self, coarse_model_path: str, fine_model_path: str, sentiment_model_path: str):
-        print("\n🚀 Initializing Ensemble Text Emotion Analyzer...")
-        self.coarse_model    = EnhancedTextEmotionModel(coarse_model_path, "coarse")
-        self.fine_model      = EnhancedTextEmotionModel(fine_model_path, "fine")
+    def __init__(self, basic_model_path: str, advanced_model_path: str, sentiment_model_path: str):
+        print("\nInitializing Ensemble Text Emotion Analyzer...")
+        self.basic_model    = EnhancedTextEmotionModel(basic_model_path, "basic")
+        self.advanced_model = EnhancedTextEmotionModel(advanced_model_path, "advanced")
         self.sentiment_model = EnhancedTextEmotionModel(sentiment_model_path, "sentiment")
-        print("✅ All models loaded successfully!")
+        print("All models loaded successfully!")
 
     def analyze(self, text: str) -> Dict[str, Any]:
-        print(f"\n🔍 Analyzing: '{text[:50]}...'")
+        print(f"\nAnalyzing: '{text[:50]}...'")
 
-        coarse_result    = self.coarse_model.predict_with_attention(text)
-        fine_result      = self.fine_model.predict_with_attention(text)
+        basic_result    = self.basic_model.predict_with_attention(text)
+        advanced_result = self.advanced_model.predict_with_attention(text)
         sentiment_result = self.sentiment_model.predict_with_attention(text)
 
         combined = {
             "text": text,
             "predictions": {
-                "coarse_emotion": {
-                    "emotion": coarse_result.predicted_emotion,
-                    "confidence": coarse_result.confidence,
-                    "top_words": coarse_result.important_tokens[:5],
+                "basic_emotion": {
+                    "emotion":    basic_result.predicted_emotion,
+                    "confidence": basic_result.confidence,
+                    "top_words":  basic_result.important_tokens[:5],
                 },
-                "fine_emotion": {
-                    "emotion": fine_result.predicted_emotion,
-                    "confidence": fine_result.confidence,
-                    "top_words": fine_result.important_tokens[:5],
+                "advanced_emotion": {
+                    "emotion":    advanced_result.predicted_emotion,
+                    "confidence": advanced_result.confidence,
+                    "top_words":  advanced_result.important_tokens[:5],
                 },
                 "sentiment": {
-                    "sentiment": sentiment_result.predicted_emotion,
+                    "sentiment":  sentiment_result.predicted_emotion,
                     "confidence": sentiment_result.confidence,
-                    "top_words": sentiment_result.important_tokens[:5],
+                    "top_words":  sentiment_result.important_tokens[:5],
                 },
             },
-            "linguistic_indicators": coarse_result.sentiment_indicators,
-            "explanation": self._generate_combined_explanation(coarse_result, fine_result, sentiment_result),
+            "linguistic_indicators": basic_result.sentiment_indicators,
+            "explanation": self._generate_combined_explanation(basic_result, advanced_result, sentiment_result),
             "raw_results": {
-                "coarse":    coarse_result,
-                "fine":      fine_result,
+                "basic":    basic_result,
+                "advanced": advanced_result,
                 "sentiment": sentiment_result,
             },
         }
@@ -380,56 +382,56 @@ class EnsembleTextEmotionAnalyzer:
 
     def _generate_combined_explanation(
         self,
-        coarse_result: TextEmotionResult,
-        fine_result: TextEmotionResult,
+        basic_result: TextEmotionResult,
+        advanced_result: TextEmotionResult,
         sentiment_result: TextEmotionResult,
     ) -> str:
         lines: List[str] = []
         lines.append("=" * 60)
-        lines.append("🧠 COMPLETE EMOTION ANALYSIS")
+        lines.append("COMPLETE EMOTION ANALYSIS")
         lines.append("=" * 60)
 
-        lines.append("\n📊 Model Predictions:")
-        lines.append(f"   • Coarse Emotion : {coarse_result.predicted_emotion} ({coarse_result.confidence:.1%})")
-        lines.append(f"   • Fine Emotion   : {fine_result.predicted_emotion} ({fine_result.confidence:.1%})")
-        lines.append(f"   • Sentiment      : {sentiment_result.predicted_emotion} ({sentiment_result.confidence:.1%})")
+        lines.append("\nModel Predictions:")
+        lines.append(f"   Basic Emotion    : {basic_result.predicted_emotion} ({basic_result.confidence:.1%})")
+        lines.append(f"   Advanced Emotion : {advanced_result.predicted_emotion} ({advanced_result.confidence:.1%})")
+        lines.append(f"   Sentiment        : {sentiment_result.predicted_emotion} ({sentiment_result.confidence:.1%})")
 
-        coarse_words = {w for w, _ in coarse_result.important_tokens[:10]}
-        fine_words   = {w for w, _ in fine_result.important_tokens[:10]}
-        shared_words = coarse_words & fine_words
+        basic_words    = {w for w, _ in basic_result.important_tokens[:10]}
+        advanced_words = {w for w, _ in advanced_result.important_tokens[:10]}
+        shared_words   = basic_words & advanced_words
 
         if shared_words:
-            lines.append(f"\n🔗 Corroborating Key Words: {', '.join(list(shared_words)[:5])}")
+            lines.append(f"\nCorroborating Key Words: {', '.join(list(shared_words)[:5])}")
 
-        lines.append("\n📝 Key Influential Tokens (Coarse Model):")
-        for token, score in coarse_result.important_tokens[:5]:
-            lines.append(f"   • '{token}': {score:.3f}")
+        lines.append("\nKey Influential Tokens (Basic Model):")
+        for token, score in basic_result.important_tokens[:5]:
+            lines.append(f"   '{token}': {score:.3f}")
 
-        ind = coarse_result.sentiment_indicators
-        lines.append("\n💡 Linguistic Signals:")
+        ind = basic_result.sentiment_indicators
+        lines.append("\nLinguistic Signals:")
         if ind["positive_words"]:
-            lines.append(f"   ✓ Positive markers: {', '.join(ind['positive_words'][:3])}")
+            lines.append(f"   Positive markers: {', '.join(ind['positive_words'][:3])}")
         if ind["negative_words"]:
-            lines.append(f"   ✓ Negative markers: {', '.join(ind['negative_words'][:3])}")
+            lines.append(f"   Negative markers: {', '.join(ind['negative_words'][:3])}")
         if ind["negations"]:
-            lines.append(f"   ⚠ Negation markers: {', '.join(ind['negations'][:3])}")
+            lines.append(f"   Negation markers: {', '.join(ind['negations'][:3])}")
 
         return "\n".join(lines)
 
     def visualize_ensemble(self, results: Dict[str, Any], save_dir: Optional[str] = None):
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        fig.suptitle("SONAR – Text Emotion Ensemble Analysis", fontsize=14, fontweight="bold")
+        fig.suptitle("Text Emotion Ensemble Analysis", fontsize=14, fontweight="bold")
 
         ax1 = axes[0, 0]
-        models      = ["Coarse", "Fine-Grained", "Sentiment"]
+        models      = ["Basic", "Advanced", "Sentiment"]
         confidences = [
-            results["predictions"]["coarse_emotion"]["confidence"],
-            results["predictions"]["fine_emotion"]["confidence"],
+            results["predictions"]["basic_emotion"]["confidence"],
+            results["predictions"]["advanced_emotion"]["confidence"],
             results["predictions"]["sentiment"]["confidence"],
         ]
         emotions = [
-            results["predictions"]["coarse_emotion"]["emotion"],
-            results["predictions"]["fine_emotion"]["emotion"],
+            results["predictions"]["basic_emotion"]["emotion"],
+            results["predictions"]["advanced_emotion"]["emotion"],
             results["predictions"]["sentiment"]["sentiment"],
         ]
         colors = ["#3498db", "#e74c3c", "#2ecc71"]
@@ -438,23 +440,19 @@ class EnsembleTextEmotionAnalyzer:
         ax1.set_title("Model Confidence Comparison")
         ax1.set_ylim(0, 1)
         for bar, emotion in zip(bars, emotions):
-            ax1.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                bar.get_height(),
-                emotion,
-                ha="center", va="bottom", fontsize=9,
-            )
+            ax1.text(bar.get_x() + bar.get_width() / 2.0, bar.get_height(),
+                     emotion, ha="center", va="bottom", fontsize=9)
 
         ax2 = axes[0, 1]
-        coarse_result = results["raw_results"]["coarse"]
-        top_words     = coarse_result.important_tokens[:10]
+        basic_result = results["raw_results"]["basic"]
+        top_words    = basic_result.important_tokens[:10]
         if top_words:
             words, scores = zip(*top_words)
             ax2.barh(range(len(words)), scores, color="#3498db", alpha=0.7)
             ax2.set_yticks(range(len(words)))
             ax2.set_yticklabels(words)
             ax2.set_xlabel("Attention Weight")
-            ax2.set_title("Most Important Words (Coarse Model)")
+            ax2.set_title("Most Important Words (Basic Model)")
             ax2.invert_yaxis()
 
         ax3 = axes[1, 0]
@@ -476,16 +474,16 @@ class EnsembleTextEmotionAnalyzer:
         ax3.set_title("Linguistic Indicators")
 
         ax4 = axes[1, 1]
-        fine_result  = results["raw_results"]["fine"]
-        sorted_probs = sorted(fine_result.all_probabilities.items(), key=lambda x: x[1], reverse=True)[:8]
+        advanced_result = results["raw_results"]["advanced"]
+        sorted_probs    = sorted(advanced_result.all_probabilities.items(), key=lambda x: x[1], reverse=True)[:8]
         if sorted_probs:
-            emotions_f, probs_f = zip(*sorted_probs)
-            colors_f = ["#e74c3c" if i == 0 else "#95a5a6" for i in range(len(emotions_f))]
-            ax4.barh(range(len(emotions_f)), probs_f, color=colors_f, alpha=0.7)
-            ax4.set_yticks(range(len(emotions_f)))
-            ax4.set_yticklabels(emotions_f)
+            emotions_adv, probs_adv = zip(*sorted_probs)
+            colors_f = ["#e74c3c" if i == 0 else "#95a5a6" for i in range(len(emotions_adv))]
+            ax4.barh(range(len(emotions_adv)), probs_adv, color=colors_f, alpha=0.7)
+            ax4.set_yticks(range(len(emotions_adv)))
+            ax4.set_yticklabels(emotions_adv)
             ax4.set_xlabel("Probability")
-            ax4.set_title("Emotion Distribution (Fine-Grained Model)")
+            ax4.set_title("Emotion Distribution (Advanced Model)")
             ax4.invert_yaxis()
 
         plt.tight_layout()
@@ -507,58 +505,38 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def preprocess_go_emotions_coarse():
+def preprocess_twitter_emotion_basic():
     """
-    GoEmotions → 4-class coarse emotion classification (happy, sad, angry, neutral).
-    Uses the standard 80/10/10 train/dev/test splits from the original dataset.
+    Twitter Emotion dataset → 5-class basic emotion classification.
+    Classes: anger, fear, joy, sadness, surprise  (20,000 samples)
+    Hugging Face dataset: 'dair-ai/emotion'
     """
-    print("\n--- Preparing GoEmotions Dataset for COARSE Emotion Classification (4 Classes) ---")
+    print("\n--- Preparing Twitter Emotion Dataset for BASIC Emotion Classification (5 Classes) ---")
 
-    coarse_map = {
-        "happy":   ["amusement", "excitement", "joy", "love", "optimism", "pride",
-                    "relief", "gratitude", "admiration", "approval", "caring"],
-        "sad":     ["disappointment", "grief", "sadness", "remorse"],
-        "angry":   ["anger", "annoyance", "disapproval", "disgust"],
-        "neutral": ["neutral"],
-    }
-    emotion_to_coarse = {
-        emotion: coarse
-        for coarse, emotions in coarse_map.items()
-        for emotion in emotions
-    }
+    ds    = load_dataset("dair-ai/emotion", split="train")
+    df    = ds.to_pandas()
 
-    splits = {}
-    for split in ["train", "validation", "test"]:
-        ds  = load_dataset("google-research-datasets/go_emotions", "simplified", split=split)
-        df  = ds.to_pandas()
+    # dair-ai/emotion label mapping: 0=sadness, 1=joy, 2=love, 3=anger, 4=fear, 5=surprise
+    label_map = {0: "sadness", 1: "joy", 2: None, 3: "anger", 4: "fear", 5: "surprise"}
 
-        label_names = ds.features["labels"].feature.names
+    df["label_text"] = df["label"].map(label_map)
+    df = df.dropna(subset=["label_text"])  # drop 'love' which is not in our 5 classes
+    df["text"]  = df["text"].apply(clean_text)
+    df["label"] = df["label_text"].map(BASIC_LABEL2ID)
+    df = df[["text", "label", "label_text"]].dropna()
 
-        def get_coarse(row):
-            for lid in row["labels"]:
-                fine = label_names[lid]
-                if fine in emotion_to_coarse:
-                    return emotion_to_coarse[fine]
-            return "neutral"
+    print(f"Basic emotion classes: {BASIC_EMOTIONS}")
+    print(f"Total samples: {len(df)} | distribution: {df['label_text'].value_counts().to_dict()}")
 
-        df["label_text"] = df.apply(get_coarse, axis=1)
-        df["text"]       = df["text"].apply(clean_text)
-        df["label"]      = df["label_text"].map(COARSE_LABEL2ID)
-        splits[split]    = df[["text", "label", "label_text"]].dropna()
-
-    print(f"Coarse emotion classes: {COARSE_EMOTIONS}")
-    for split, df in splits.items():
-        print(f"  {split}: {len(df)} samples | distribution: {df['label_text'].value_counts().to_dict()}")
-
-    return splits, COARSE_LABEL2ID, COARSE_ID2LABEL
+    return df, BASIC_LABEL2ID, BASIC_ID2LABEL
 
 
-def preprocess_go_emotions_fine():
+def preprocess_go_emotions_advanced():
     """
-    GoEmotions → 27-class fine-grained emotion classification (neutral excluded).
-    Uses the standard 80/10/10 train/dev/test splits.
+    GoEmotions → 28-class fine-grained emotion classification.
+    Uses the standard 80/10/10 train/dev/test splits (54,263 samples).
     """
-    print("\n--- Preparing GoEmotions Dataset for FINE-GRAINED Emotion Classification (27 Classes) ---")
+    print("\n--- Preparing GoEmotions Dataset for ADVANCED Emotion Classification (28 Classes) ---")
 
     splits = {}
     for split in ["train", "validation", "test"]:
@@ -566,64 +544,70 @@ def preprocess_go_emotions_fine():
         df          = ds.to_pandas()
         label_names = ds.features["labels"].feature.names
 
-        def get_fine(row):
+        def get_advanced(row):
             for lid in row["labels"]:
-                fine = label_names[lid]
-                if fine in FINE_LABEL2ID:
-                    return fine
+                label = label_names[lid]
+                if label in ADVANCED_LABEL2ID:
+                    return label
             return None
 
-        df["label_text"] = df.apply(get_fine, axis=1)
+        df["label_text"] = df.apply(get_advanced, axis=1)
         df               = df.dropna(subset=["label_text"])
         df["text"]       = df["text"].apply(clean_text)
-        df["label"]      = df["label_text"].map(FINE_LABEL2ID)
+        df["label"]      = df["label_text"].map(ADVANCED_LABEL2ID)
         splits[split]    = df[["text", "label", "label_text"]].dropna()
 
-    print(f"Fine-grained classes (27): {FINE_EMOTIONS[:8]}...")
+    print(f"Advanced emotion classes (28): {ADVANCED_EMOTIONS[:8]}...")
     for split, df in splits.items():
         print(f"  {split}: {len(df)} samples")
 
-    return splits, FINE_LABEL2ID, FINE_ID2LABEL
+    return splits, ADVANCED_LABEL2ID, ADVANCED_ID2LABEL
 
 
-def preprocess_sentiment140():
+def preprocess_tweeteval_sentiment():
     """
-    Sentiment140 → 3-class sentiment (negative, neutral, positive).
-    Sentiment140 labels: 0 = negative, 2 = neutral, 4 = positive.
+    TweetEval sentiment → 3-class sentiment (negative, neutral, positive).
+    Dataset: 'tweet_eval' / 'sentiment' (59,899 samples)
+    Labels: 0=negative, 1=neutral, 2=positive
     """
-    print("\n--- Preparing Sentiment140 Dataset for SENTIMENT Analysis (3 Classes) ---")
+    print("\n--- Preparing TweetEval Dataset for SENTIMENT Analysis (3 Classes) ---")
 
-    ds = load_dataset("sentiment140", split="train")
-    df = ds.to_pandas()
+    tweeteval_map = {0: "negative", 1: "neutral", 2: "positive"}
 
-    sentiment140_to_label = {0: "negative", 2: "neutral", 4: "positive"}
-    df["label_text"] = df["sentiment"].map(sentiment140_to_label)
-    df               = df.dropna(subset=["label_text"])
-    df["text"]       = df["text"].apply(clean_text)
-    df["label"]      = df["label_text"].map(SENTIMENT_LABEL2ID)
-    df               = df[["text", "label", "label_text"]].dropna()
+    splits = {}
+    for split in ["train", "validation", "test"]:
+        ds           = load_dataset("tweet_eval", "sentiment", split=split)
+        df           = ds.to_pandas()
+        df["label_text"] = df["label"].map(tweeteval_map)
+        df           = df.dropna(subset=["label_text"])
+        df["text"]   = df["text"].apply(clean_text)
+        df["label"]  = df["label_text"].map(SENTIMENT_LABEL2ID)
+        splits[split] = df[["text", "label", "label_text"]].dropna()
 
     print(f"Sentiment classes: {SENTIMENT_LABELS}")
-    print(f"Total samples: {len(df)} | distribution: {df['label_text'].value_counts().to_dict()}")
+    for split, df in splits.items():
+        print(f"  {split}: {len(df)} samples | distribution: {df['label_text'].value_counts().to_dict()}")
 
-    return df, SENTIMENT_LABEL2ID, SENTIMENT_ID2LABEL
-
-
-def splits_to_hf_dataset(splits: Dict[str, pd.DataFrame]) -> DatasetDict:
-    return DatasetDict({
-        "train":      Dataset.from_pandas(splits["train"],      preserve_index=False),
-        "validation": Dataset.from_pandas(splits["validation"], preserve_index=False),
-        "test":       Dataset.from_pandas(splits["test"],       preserve_index=False),
-    })
+    return splits, SENTIMENT_LABEL2ID, SENTIMENT_ID2LABEL
 
 
 def df_to_hf_dataset(df: pd.DataFrame) -> DatasetDict:
+    """Split a single DataFrame into train/val/test HF DatasetDict."""
     train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df["label"])
     val_df,   test_df = train_test_split(temp_df, test_size=0.5, random_state=42, stratify=temp_df["label"])
     return DatasetDict({
         "train":      Dataset.from_pandas(train_df, preserve_index=False),
         "validation": Dataset.from_pandas(val_df,   preserve_index=False),
         "test":       Dataset.from_pandas(test_df,  preserve_index=False),
+    })
+
+
+def splits_to_hf_dataset(splits: Dict[str, pd.DataFrame]) -> DatasetDict:
+    """Convert pre-split dict of DataFrames to HF DatasetDict."""
+    return DatasetDict({
+        "train":      Dataset.from_pandas(splits["train"],      preserve_index=False),
+        "validation": Dataset.from_pandas(splits["validation"], preserve_index=False),
+        "test":       Dataset.from_pandas(splits["test"],       preserve_index=False),
     })
 
 
@@ -709,7 +693,7 @@ def train_model(
         ignore_mismatched_sizes=True,
     ).to(device)
 
-    # Freeze all layers, then unfreeze only the final transformer layer
+    # Freeze all layers; unfreeze only the final transformer layer + classifier
     for param in model.parameters():
         param.requires_grad = False
     if hasattr(model, "roberta"):
@@ -722,7 +706,7 @@ def train_model(
         param.requires_grad = True
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"✅ Final transformer layer + classifier unfrozen. Trainable params: {trainable:,}")
+    print(f"Final transformer layer + classifier unfrozen. Trainable params: {trainable:,}")
 
     output_dir  = f"./results_{model_name}"
     logging_dir = f"./logs_{model_name}"
@@ -788,35 +772,35 @@ def train_model(
 # ==================== MAIN ====================
 
 if __name__ == "__main__":
-    # 1. COARSE EMOTION MODEL (EmoRoBERTa-X, 4 classes)
-    coarse_splits, label2id_coarse, id2label_coarse = preprocess_go_emotions_coarse()
-    ds_coarse = splits_to_hf_dataset(coarse_splits)
-    best_coarse = train_model(ds_coarse, label2id_coarse, id2label_coarse,
-                              "coarse_emotion", COARSE_MODEL_CHECKPOINT)
+    # 1. BASIC EMOTION MODEL (EmoRoBERTa-X, Twitter Emotion, 5 classes)
+    df_basic, label2id_basic, id2label_basic = preprocess_twitter_emotion_basic()
+    ds_basic = df_to_hf_dataset(df_basic)
+    best_basic = train_model(ds_basic, label2id_basic, id2label_basic,
+                             "basic_emotion", EMORO_CHECKPOINT)
 
-    # 2. FINE-GRAINED EMOTION MODEL (EmoRoBERTa-X, 27 classes)
-    fine_splits, label2id_fine, id2label_fine = preprocess_go_emotions_fine()
-    ds_fine = splits_to_hf_dataset(fine_splits)
-    best_fine = train_model(ds_fine, label2id_fine, id2label_fine,
-                            "fine_emotion", FINE_MODEL_CHECKPOINT)
+    # 2. ADVANCED EMOTION MODEL (EmoRoBERTa-X, GoEmotions, 28 classes)
+    adv_splits, label2id_adv, id2label_adv = preprocess_go_emotions_advanced()
+    ds_advanced = splits_to_hf_dataset(adv_splits)
+    best_advanced = train_model(ds_advanced, label2id_adv, id2label_adv,
+                                "advanced_emotion", EMORO_CHECKPOINT)
 
-    # 3. SENTIMENT MODEL (DeBERTaV3, Sentiment140, 3 classes)
-    df_sent, label2id_sent, id2label_sent = preprocess_sentiment140()
-    ds_sent = df_to_hf_dataset(df_sent)
-    best_sentiment = train_model(ds_sent, label2id_sent, id2label_sent,
-                                 "sentiment", SENTIMENT_MODEL_CHECKPOINT)
+    # 3. SENTIMENT MODEL (DeBERTa, TweetEval, 3 classes)
+    sent_splits, label2id_sent, id2label_sent = preprocess_tweeteval_sentiment()
+    ds_sentiment = splits_to_hf_dataset(sent_splits)
+    best_sentiment = train_model(ds_sentiment, label2id_sent, id2label_sent,
+                                 "sentiment", SENTIMENT_CHECKPOINT)
 
     print("\n" + "=" * 20 + " ALL MODELS TRAINED. DEMO INFERENCE. " + "=" * 20)
 
-    pipe_coarse = pipeline(
-        "text-classification", model=best_coarse,
+    pipe_basic = pipeline(
+        "text-classification", model=best_basic,
         device=0 if device.type == "cuda" else -1,
     )
-    pipe_fine = pipeline(
-        "text-classification", model=best_fine,
+    pipe_advanced = pipeline(
+        "text-classification", model=best_advanced,
         device=0 if device.type == "cuda" else -1,
     )
-    pipe_sent = pipeline(
+    pipe_sentiment = pipeline(
         "text-classification", model=best_sentiment,
         device=0 if device.type == "cuda" else -1,
     )
@@ -829,15 +813,15 @@ if __name__ == "__main__":
 
     for text in test_texts:
         print(f"\n--- PIPELINE ANALYSIS: '{text}' ---")
-        c = pipe_coarse(text)[0]
-        f = pipe_fine(text)[0]
-        s = pipe_sent(text)[0]
-        print(f"Coarse Emotion  : {c['label']} (Score: {c['score']:.4f})")
-        print(f"Fine Emotion    : {f['label']} (Score: {f['score']:.4f})")
-        print(f"Sentiment       : {s['label']} (Score: {s['score']:.4f})")
+        b = pipe_basic(text)[0]
+        a = pipe_advanced(text)[0]
+        s = pipe_sentiment(text)[0]
+        print(f"Basic Emotion    : {b['label']} (Score: {b['score']:.4f})")
+        print(f"Advanced Emotion : {a['label']} (Score: {a['score']:.4f})")
+        print(f"Sentiment        : {s['label']} (Score: {s['score']:.4f})")
 
     # ENSEMBLE + EXPLAINABLE DEMO
-    analyzer = EnsembleTextEmotionAnalyzer(best_coarse, best_fine, best_sentiment)
+    analyzer = EnsembleTextEmotionAnalyzer(best_basic, best_advanced, best_sentiment)
 
     demo_text = "I'm so excited about this! This is absolutely amazing and wonderful!"
     results   = analyzer.analyze(demo_text)
@@ -846,9 +830,9 @@ if __name__ == "__main__":
     print("\nRaw predictions:", results["predictions"])
 
     analyzer.visualize_ensemble(results, save_dir="./viz")
-    analyzer.coarse_model.visualize_attention(
-        results["raw_results"]["coarse"],
-        save_path="./viz/coarse_attention.png",
+    analyzer.basic_model.visualize_attention(
+        results["raw_results"]["basic"],
+        save_path="./viz/basic_attention.png",
     )
 
-    print("\n✅ Pipeline complete.")
+    print("\nPipeline complete.")

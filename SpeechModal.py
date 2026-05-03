@@ -1,27 +1,27 @@
 """
-SONAR – Speech Emotion Recognition (SER) + Explainability
+Speech Emotion Recognition (SER) + Explainability
 
 Pipeline:
 1) Prepare SER dataset from:
-   - RAVDESS
-   - CREMA-D
-   - MELD
-   - TESS
-   - IEMOCAP (held-out test – leave-one-corpus-out evaluation)
+   - RAVDESS  (1,440 samples)
+   - CREMA-D  (7,442 samples)
+   - TESS     (2,800 samples)
+   - IEMOCAP  (held-out test – leave-one-corpus-out evaluation, 5,531 samples)
 
-   Coarse emotion labels aligned across all corpora: {happy, sad, angry, neutral}
+   Emotion labels: {anger, fear, joy, sadness, surprise}
 
 2) Train WavLM-large SER model:
-   - Backbone : microsoft/wavlm-large
-   - Emotions : ['happy', 'sad', 'angry', 'neutral']
-   - Train on  : RAVDESS + CREMA-D + MELD + TESS
-   - Test on   : IEMOCAP (unseen domain)
-   - Only the final transformer block and classification head are unfrozen
+   - Backbone       : microsoft/wavlm-large
+   - Emotions       : ['anger', 'fear', 'joy', 'sadness', 'surprise']
+   - Train on       : RAVDESS + CREMA-D + TESS
+   - Test on        : IEMOCAP (unseen domain, cross-corpus evaluation)
+   - Frozen layers  : convolutional feature extractor frozen; final transformer
+                      block and classification head unfrozen
    - Saves best model to: ./final_best_ser_model
 
 3) EnhancedSpeechEmotionModel:
    - Loads trained SER model
-   - Uses Whisper for speech-to-text (ASR confidence forwarded to fusion stage)
+   - Uses Whisper (tiny) for speech-to-text (ASR confidence forwarded to fusion)
    - Extracts prosodic features (pitch, energy, MFCCs, jitter, pauses, etc.)
    - Generates human-readable explanations
 """
@@ -68,13 +68,13 @@ warnings.filterwarnings("ignore")
 
 # ==================== CONFIG ====================
 
+# TODO: Set these to your actual dataset locations
 RAVDESS_DIR = "path/to/ravdess"
 CREMA_D_DIR = "path/to/crema_d"
-MELD_DIR    = "path/to/meld"
 TESS_DIR    = "path/to/tess"
 IEMOCAP_DIR = "path/to/iemocap"
 
-TARGET_EMOTIONS = ["happy", "sad", "angry", "neutral"]
+TARGET_EMOTIONS = ["anger", "fear", "joy", "sadness", "surprise"]
 NUM_LABELS      = len(TARGET_EMOTIONS)
 EMOTION_TO_ID   = {e: i for i, e in enumerate(TARGET_EMOTIONS)}
 ID_TO_EMOTION   = {i: e for i, e in enumerate(TARGET_EMOTIONS)}
@@ -83,9 +83,9 @@ SER_MODEL_NAME     = "microsoft/wavlm-large"
 WHISPER_MODEL_SIZE = "tiny"
 
 BATCH_SIZE      = 2
-GRAD_ACCUM      = 8
-LEARNING_RATE   = 1e-4
-NUM_EPOCHS      = 10
+GRAD_ACCUM      = 8           # effective batch size = 2 * 8 = 16
+LEARNING_RATE   = 1e-5
+NUM_EPOCHS      = 5
 EVAL_STEPS      = 100
 SAMPLING_RATE   = 16000
 OUTPUT_DIR      = "./ser_results"
@@ -104,7 +104,7 @@ print(f"Batch size     : {BATCH_SIZE}, GradAccum: {GRAD_ACCUM}, fp16: {USE_FP16}
 def build_ravdess_df(ravdess_dir: str) -> pd.DataFrame:
     """
     RAVDESS filename: modality-vocalchannel-emotion-intensity-statement-repetition-actor.wav
-    Emotion codes: 3=happy, 4=sad, 5=angry, 1/2=neutral
+    Emotion codes: 3=happy(joy), 4=sad(sadness), 5=angry(anger), 6=fear, 8=surprise
     """
     data = []
     if not os.path.isdir(ravdess_dir):
@@ -126,14 +126,16 @@ def build_ravdess_df(ravdess_dir: str) -> pd.DataFrame:
             except ValueError:
                 continue
 
-            if code == 3:
-                emotion = "happy"
+            if code == 5:
+                emotion = "anger"
+            elif code == 6:
+                emotion = "fear"
+            elif code == 3:
+                emotion = "joy"
             elif code == 4:
-                emotion = "sad"
-            elif code == 5:
-                emotion = "angry"
-            elif code in (1, 2):
-                emotion = "neutral"
+                emotion = "sadness"
+            elif code == 8:
+                emotion = "surprise"
             else:
                 continue
 
@@ -147,7 +149,7 @@ def build_ravdess_df(ravdess_dir: str) -> pd.DataFrame:
 def build_crema_d_df(crema_d_dir: str) -> pd.DataFrame:
     """
     CREMA-D filename: ID_ID_EMOTION_...
-    Emotion codes: HAP, SAD, ANG, NEU
+    Emotion codes: ANG, FEA, HAP, SAD, SUR
     """
     data = []
     if not os.path.isdir(crema_d_dir):
@@ -162,14 +164,16 @@ def build_crema_d_df(crema_d_dir: str) -> pd.DataFrame:
             continue
         code = parts[2]
 
-        if code == "HAP":
-            emotion = "happy"
+        if code == "ANG":
+            emotion = "anger"
+        elif code == "FEA":
+            emotion = "fear"
+        elif code == "HAP":
+            emotion = "joy"
         elif code == "SAD":
-            emotion = "sad"
-        elif code == "ANG":
-            emotion = "angry"
-        elif code == "NEU":
-            emotion = "neutral"
+            emotion = "sadness"
+        elif code == "SUR":
+            emotion = "surprise"
         else:
             continue
 
@@ -180,56 +184,10 @@ def build_crema_d_df(crema_d_dir: str) -> pd.DataFrame:
     return df
 
 
-def build_meld_df(meld_dir: str) -> pd.DataFrame:
-    """
-    MELD: expects train_sent_emo.csv alongside an audio/ subfolder.
-    CSV columns required: Dialogue_ID, Utterance_ID, Emotion.
-    Audio files expected at: audio/dia{Dialogue_ID}_utt{Utterance_ID}.wav
-    Coarse mapping: joy/surprise -> happy, sadness -> sad, anger/disgust -> angry, neutral/fear -> neutral.
-    Adapt the wav_file path construction to match your directory layout.
-    """
-    data = []
-    if not os.path.isdir(meld_dir):
-        print(f"MELD not found: {meld_dir}")
-        return pd.DataFrame(columns=["path", "emotion"])
-
-    csv_path = os.path.join(meld_dir, "train_sent_emo.csv")
-    if not os.path.isfile(csv_path):
-        print(f"MELD CSV not found: {csv_path}. Skipping MELD.")
-        return pd.DataFrame(columns=["path", "emotion"])
-
-    meld_coarse = {
-        "joy":      "happy",
-        "surprise": "happy",
-        "sadness":  "sad",
-        "anger":    "angry",
-        "disgust":  "angry",
-        "neutral":  "neutral",
-        "fear":     "neutral",
-    }
-
-    df_csv = pd.read_csv(csv_path)
-    for _, row in df_csv.iterrows():
-        raw = str(row.get("Emotion", "")).lower().strip()
-        emotion = meld_coarse.get(raw)
-        if emotion is None:
-            continue
-        dia_id   = row.get("Dialogue_ID", "")
-        utt_id   = row.get("Utterance_ID", "")
-        wav_file = os.path.join(meld_dir, "audio", f"dia{dia_id}_utt{utt_id}.wav")
-        if not os.path.isfile(wav_file):
-            continue
-        data.append({"path": wav_file, "emotion": emotion})
-
-    df = pd.DataFrame(data)
-    print(f"MELD samples: {len(df)}")
-    return df
-
-
 def build_tess_df(tess_dir: str) -> pd.DataFrame:
     """
     TESS filename: OAF_word_emotion.wav / YAF_word_emotion.wav
-    Keeps only: happy, sad, angry, neutral
+    Keeps only: angry(anger), fear, happy(joy), sad(sadness), surprised(surprise)
     """
     data = []
     if not os.path.isdir(tess_dir):
@@ -248,14 +206,16 @@ def build_tess_df(tess_dir: str) -> pd.DataFrame:
                 continue
             emotion_str = parts[-1].split(".")[0].lower()
 
-            if emotion_str == "happy":
-                emotion = "happy"
+            if emotion_str in ("angry", "anger"):
+                emotion = "anger"
+            elif emotion_str == "fear":
+                emotion = "fear"
+            elif emotion_str == "happy":
+                emotion = "joy"
             elif emotion_str == "sad":
-                emotion = "sad"
-            elif emotion_str in ("angry", "anger"):
-                emotion = "angry"
-            elif emotion_str in ("neutral", "neu"):
-                emotion = "neutral"
+                emotion = "sadness"
+            elif emotion_str in ("surprised", "surprise"):
+                emotion = "surprise"
             else:
                 continue
 
@@ -269,7 +229,8 @@ def build_tess_df(tess_dir: str) -> pd.DataFrame:
 def build_iemocap_df(iemocap_dir: str) -> pd.DataFrame:
     """
     IEMOCAP held-out test corpus (leave-one-corpus-out evaluation).
-    Coarse mapping via filename suffixes: hap/exc -> happy, sad -> sad, ang -> angry, neu -> neutral.
+    Coarse mapping via filename suffixes:
+      ang -> anger, fea -> fear, hap/exc -> joy, sad -> sadness, sur -> surprise.
     Adapt parsing to your EmoEvaluation file structure as needed.
     """
     data = []
@@ -278,11 +239,12 @@ def build_iemocap_df(iemocap_dir: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["path", "emotion"])
 
     code_map = {
-        "_hap": "happy",
-        "_exc": "happy",
-        "_sad": "sad",
-        "_ang": "angry",
-        "_neu": "neutral",
+        "_ang": "anger",
+        "_fea": "fear",
+        "_hap": "joy",
+        "_exc": "joy",
+        "_sad": "sadness",
+        "_sur": "surprise",
     }
 
     for root, _, files in os.walk(iemocap_dir):
@@ -306,16 +268,15 @@ def build_iemocap_df(iemocap_dir: str) -> pd.DataFrame:
 
 def build_splits() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Train + Val: RAVDESS + CREMA-D + MELD + TESS (stratified 90/10 split)
+    Train + Val: RAVDESS + CREMA-D + TESS (stratified 90/10 split)
     Test       : IEMOCAP (held-out, leave-one-corpus-out)
     """
     ravdess_df = build_ravdess_df(RAVDESS_DIR)
     crema_d_df = build_crema_d_df(CREMA_D_DIR)
-    meld_df    = build_meld_df(MELD_DIR)
     tess_df    = build_tess_df(TESS_DIR)
     iemocap_df = build_iemocap_df(IEMOCAP_DIR)
 
-    combined_df = pd.concat([ravdess_df, crema_d_df, meld_df, tess_df], ignore_index=True)
+    combined_df = pd.concat([ravdess_df, crema_d_df, tess_df], ignore_index=True)
     combined_df = combined_df.dropna(subset=["emotion"])
 
     print(f"\nTotal combined (train+val) samples: {len(combined_df)}")
@@ -331,9 +292,9 @@ def build_splits() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
     test_df = iemocap_df.copy()
 
-    print(f"\nTrain size : {len(train_df)}")
-    print(f"Val size   : {len(val_df)}")
-    print(f"Test size (IEMOCAP): {len(test_df)}")
+    print(f"\nTrain size          : {len(train_df)}")
+    print(f"Val size            : {len(val_df)}")
+    print(f"Test size (IEMOCAP) : {len(test_df)}")
     print("\nEmotion distribution (Train):")
     print(train_df["emotion"].value_counts())
     print("\nEmotion distribution (Val):")
@@ -480,7 +441,10 @@ def train_ser_model(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.Da
         ignore_mismatched_sizes=True,
     )
 
-    # Freeze entire encoder; unfreeze only the final transformer block + head
+    # Freeze the convolutional feature extractor; unfreeze only the
+    # final transformer block + projector + classification head
+    for param in model.wavlm.feature_extractor.parameters():
+        param.requires_grad = False
     for param in model.wavlm.encoder.parameters():
         param.requires_grad = False
     for param in model.wavlm.encoder.layers[-1].parameters():
@@ -491,7 +455,8 @@ def train_ser_model(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.Da
         param.requires_grad = True
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"WavLM-large: final transformer block + classifier unfrozen. Trainable params: {trainable:,}")
+    print(f"WavLM-large: conv extractor frozen, final transformer block + head unfrozen.")
+    print(f"Trainable params: {trainable:,}")
 
     model.to(DEVICE)
 
@@ -703,8 +668,8 @@ class ProsodicFeatureExtractor:
 class EnhancedSpeechEmotionModel:
     """
     Enhanced speech emotion recognizer:
-      - WavLM-large SER backbone for coarse emotion + confidence (Cs)
-      - Whisper for ASR transcription + ASR confidence (Casr)
+      - WavLM-large SER backbone for emotion prediction + confidence (Cs)
+      - Whisper (tiny) for ASR transcription + ASR confidence (Casr)
       - Prosodic analysis for explainability
       Both Cs and Casr are forwarded to the confidence-aware fusion stage.
     """
@@ -745,7 +710,7 @@ class EnhancedSpeechEmotionModel:
     def transcribe(self, audio_path: str) -> Tuple[str, str, float]:
         """
         Returns (text, language, asr_confidence).
-        asr_confidence is approximated from the average log-probability of Whisper segments.
+        asr_confidence approximated from average log-probability of Whisper segments.
         """
         if self.whisper_model is None:
             return "Transcription unavailable (Whisper not loaded)", "unknown", 0.0
@@ -867,6 +832,7 @@ if __name__ == "__main__":
     else:
         print("Skipping SER training (RUN_TRAINING=False).")
 
+    # TODO: Replace with a real .wav file path
     DEMO_AUDIO_PATH = "path/to/some_test_audio.wav"
 
     if os.path.isfile(DEMO_AUDIO_PATH):
